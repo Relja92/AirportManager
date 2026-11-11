@@ -1,6 +1,9 @@
 {
   "name": "Airport Manager",
   "short_name": "Airport Manager",
+  "description": "Build your airline, manage routes and aircraft, and explore the world. Play from your home screen, online or offline.",
+  "lang": "en",
+  "categories": ["games", "simulation"],
   "id": "/",
   "start_url": "/",
   "scope": "/",

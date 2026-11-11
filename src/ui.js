@@ -12,6 +12,7 @@ import { ATTENTION_GROUPS, operationsAttention, contractDueSoon, resolveAlertTar
 import { matchesSearch, airportMatches, routeMatches, planeMatches, searchNetwork } from './search.js';
 import { RESULT_DAYS, changeOutcome } from './changeResults.js';
 import { icon } from './icons.js';
+import { pwa } from './pwa.js';
 import { SPECIALIZATIONS, SPECIALIZATION_DAYS, specializationOf } from './specializations.js';
 import { CLIENTS, clientOf, SERVICES, serviceOf, LEASE_TERMS, leaseDaysLeft } from './commercial.js';
 import { rivalHubIds, rivalStrategy, marketOverlap, canTakeOver } from './rivals.js';
@@ -36,7 +37,7 @@ const TABS = [['routes', 'Routes'], ['market', 'Fleet'], ['airport', 'Upgrades']
 const PAGES = [['company', 'Company'], ['finance', 'Finance'], ['contracts', 'Contracts'], ['calendar', 'Calendar'], ['rivals', 'Rivals'], ['goals', 'Goals & campaigns'], ['log', 'News'], ['learn', 'Tutorials'], ['more', 'More']];
 const NAV = PAGES.filter(([id]) => ['finance', 'contracts', 'rivals'].includes(id));
 const PAGE_KEYS = { finance: 'B', contracts: 'C', calendar: 'K', rivals: 'R', goals: 'G', log: 'N' };
-const PAGE_TITLES = { ...Object.fromEntries(PAGES), finder: 'Route finder', market: 'Buy or lease aircraft' };
+const PAGE_TITLES = { ...Object.fromEntries(PAGES), finder: 'Route finder', market: 'Buy or lease aircraft', 'mobile-menu': 'More' };
 const FINDER_SORTS = [['profit', 'Profit'], ['demand', 'Demand'], ['near', 'Nearest']];
 const CONTRACT_COLOR = '#5fd69a';
 const repName = (r) => (r < 30 ? 'Poor' : r < 45 ? 'Shaky' : r < 60 ? 'Decent' : r < 75 ? 'Well liked' : 'Beloved');
@@ -167,6 +168,10 @@ export function createUI(map, view) {
   let contractReview = null; // focused contract or approaching deadlines, with a return destination
   let routeQuery = '', fleetQuery = '', finderQuery = '', networkQuery = '', searchOpen = false;
   let routePane = 'overview';
+  const mobileMedia = window.matchMedia('(max-width: 760px)');
+  let mobileTab = 'map', mobilePreview = null, mobileTools = false, mobileFleetHub = 'all';
+  let mobileGuideExpanded = false, mobileScrollRestore = null;
+  const mobileScroll = {}, mobileFilters = { routes: false, fleet: false };
   const backStack = [];
   let routeFilter = 'all';
   let pick = null; // aircraft in hand
@@ -188,7 +193,7 @@ export function createUI(map, view) {
     key.search ? el.dataset.search === key.search : el.dataset.act === key.act && (el.dataset.arg || '') === key.arg);
   function rememberView() {
     if (!game.state) return;
-    backStack.push({ tab, page, sel: sel && { ...sel }, active: game.state.active, opsOpen, opsView, opsHub, opsSort, fleetSort,
+    backStack.push({ tab, page, sel: sel && { ...sel }, mobileTab, mobilePreview: mobilePreview && { ...mobilePreview }, mobileFleetHub, active: game.state.active, opsOpen, opsView, opsHub, opsSort, fleetSort,
       routeFilter, fleetFilter, routeQuery, fleetQuery, finderQuery, finderSort, finderClear, finderMarket, finderKind, contractReview, routeBack, aircraftBack, addFor, routePane, companyPane, historyFilter, historyLimit,
       collapsed: $('#panel').classList.contains('collapsed'), expandedPanel: $('#panel').classList.contains('expanded'), scroll: scrollIds.map((id) => [id, $(`#${id}`)?.scrollTop || 0]),
       expanded: scrollIds.map((id) => [id, [...($(`#${id}`)?.querySelectorAll('details[open][data-section]') || [])].map((d) => d.dataset.section)]),
@@ -203,19 +208,20 @@ export function createUI(map, view) {
     if (v.sel?.kind === 'plane') return game.plane(v.sel.id)?.name || 'aircraft';
     if (v.sel?.kind === 'route') { const r = game.route(v.sel.id); if (r) return `${r.hub} ⇄ ${r.dest}`; }
     if (v.sel?.kind === 'airport') return AIRPORT_BY_ID[v.sel.id]?.city || 'map';
+    if (mobileMedia.matches && v.mobileTab === 'map') return 'map';
     return TABS.find(([id]) => id === v.tab)?.[1] || fallback;
   }
   function returnToView() {
     const v = backStack.pop();
     if (!v || !game.state) return false;
-    ({ tab, page, sel, opsOpen, opsView, opsHub, opsSort, fleetSort, routeFilter, fleetFilter, routeQuery, fleetQuery,
+    ({ tab, page, sel, mobileTab, mobilePreview, mobileFleetHub, opsOpen, opsView, opsHub, opsSort, fleetSort, routeFilter, fleetFilter, routeQuery, fleetQuery,
       finderQuery, finderSort, finderClear, finderMarket, finderKind, contractReview, routeBack, aircraftBack, addFor, routePane, companyPane, historyFilter, historyLimit } = v);
     if (sel?.kind === 'plane' && !game.plane(sel.id) || sel?.kind === 'route' && !game.route(sel.id)) sel = null;
     if (game.isHub(v.active)) game.state.active = v.active;
-    $('#panel').classList.toggle('collapsed', v.collapsed); $('#panel').classList.toggle('expanded', v.expandedPanel); map.setSelected(sel); render();
+    $('#panel').classList.toggle('collapsed', v.collapsed); $('#panel').classList.toggle('expanded', v.expandedPanel); map.setSelected(sel || (mobileMedia.matches && mobilePreview) || null); render();
     for (const [id, sections] of v.expanded) $(`#${id}`)?.querySelectorAll('details[data-section]').forEach((el) => { el.open = sections.includes(el.dataset.section); });
     for (const [id, top] of v.scroll) { const el = $(`#${id}`); if (el) el.scrollTop = top; }
-    const surface = v.opsOpen ? $('#ops-body') : v.page ? $('#page-body') : v.sel ? $('#card') : $('#panel-body');
+    const surface = v.opsOpen ? $('#ops-body') : v.page ? $('#page-body') : v.sel ? $('#card') : $(mobileMedia.matches ? '#panel' : '#panel-body');
     findControl(surface, v.focus)?.focus({ preventScroll: true });
     return true;
   }
@@ -255,6 +261,7 @@ export function createUI(map, view) {
   function select(next, focus = false, fromOperations = false) {
     const newSelection = next && (!sel || sel.kind !== next.kind || sel.id !== next.id);
     if (next && (page || opsOpen || newSelection)) rememberView();
+    mobilePreview = null; mobileTools = false;
     if (newSelection) routePane = 'overview';
     if (next?.kind === 'plane' && !(sel?.kind === 'plane' && sel.id === next.id)) {
       aircraftBack = opsOpen || (sel?.kind === 'route' && routeBack === true) ? 'ops' : page === 'log' || (sel?.kind === 'route' && routeBack === 'log') ? 'log' : tab;
@@ -290,12 +297,130 @@ export function createUI(map, view) {
     const top = hudBox ? hudBox.bottom : 0;
     if (w > 760) return { x0: panel ? panel.right : 0, x1: card ? card.left : w, y0: top, y1: h };
     // Full reading panels cover the map; keep its camera usable when returning.
-    return { x0: 0, x1: w, y0: top, y1: card || (panel && panel.top - top < 80) ? h : panel ? panel.top : h };
+    const bottom = box($('#mobile-nav'))?.top ?? h, preview = box($('#mobile-map-preview')), guide = box($('#guide'));
+    return { x0: 0, x1: w, y0: top + (game.state ? 56 : 0), y1: Math.max(top + 140, Math.min(bottom, preview?.top ?? h, guide?.top ?? h)) };
   }
   const selectAirport = (id, focus) => select(id ? { kind: 'airport', id } : null, focus);
   const searchField = (key, value, label) => `<div class="list-search"><label><span class="sr-only">${label}</span><input type="search" data-search="${key}" value="${esc(value)}" placeholder="${label}" aria-label="${label}" autocomplete="off"></label>${value ? `<button class="search-clear" data-act="clear-search" data-arg="${key}" aria-label="Clear ${label.toLowerCase()}">×</button>` : ''}</div>`;
   const routeShown = (r) => routeMatches(r, routeQuery) && fitOf(r).matches(routeFilter);
   const planeShown = (p) => planeMatches(game, p, fleetQuery) && fleetMatches(game, p, fleetFilter);
+
+  // Phone navigation changes presentation only; all purchases, previews and
+  // management actions continue through the same handlers as the desktop UI.
+  function mobileNavigate(destination) {
+    if (!game.state || !['map', 'routes', 'fleet', 'operations', 'more'].includes(destination)) return;
+    if (!page && !sel && !opsOpen) mobileScroll[mobileTab] = $('#panel-body').scrollTop;
+    backStack.length = 0;
+    mobileTab = destination; mobilePreview = null; mobileTools = false;
+    page = null; sel = null; opsOpen = false; hubMenu = false; navOpen = false; pick = null;
+    map.setSelected(null);
+    if (destination === 'routes' || destination === 'fleet') tab = destination === 'routes' ? 'routes' : 'market';
+    if (destination === 'operations') { opsOpen = true; opsView = 'overview'; opsHub = 'all'; $('#ops-body').scrollTop = 0; }
+    if (destination === 'more') page = 'mobile-menu';
+    mobileScrollRestore = mobileScroll[destination] || 0;
+  }
+  function selectFromMap(next) {
+    if (!mobileMedia.matches || !game.state) { select(next); return; }
+    if (modal) return;
+    mobilePreview = next && { ...next }; mobileTools = false;
+    map.setSelected(mobilePreview); render();
+  }
+  function mobileMenuHTML(s) {
+    const groups = [
+      ['Company', PAGES.filter(([id]) => ['company', 'finance', 'contracts', 'rivals', 'goals', 'log'].includes(id))],
+      ['Airports & planning', [['upgrades', 'Hub & upgrades'], ['finder', 'Find a route'], ['calendar', 'Calendar']]],
+      ['Game', [['learn', 'Tutorials & lessons'], ['more', 'Settings & help']]],
+    ];
+    return `<button class="mobile-menu-row" data-act="search">${icon('search')}<span>Search airports, routes & aircraft</span><span aria-hidden="true">›</span></button><button class="mobile-menu-row" data-act="pwa-open">${icon('install')}<span>${pwa.getState().installed ? 'App & updates' : 'Install app'}${pwa.getState().updateReady ? ' · Update available' : ''}</span><span aria-hidden="true">›</span></button>` + groups.map(([label, items]) =>
+      `<div class="section-label">${label}</div>${items.map(([id, name]) => {
+        const count = id === 'contracts' ? s.contracts.filter(c => c.due == null).length : id === 'log' ? Math.max(0, Math.min(s.logN - s.logSeen, s.log.length)) : 0;
+        return `<button class="mobile-menu-row" data-act="${id === 'upgrades' ? 'mobile-upgrades' : 'page'}" data-arg="${id}">${icon(id === 'upgrades' ? 'hub' : id === 'finder' ? 'routes' : id)}<span>${name}</span>${count ? `<b class="badge">${count}</b>` : ''}<span aria-hidden="true">›</span></button>`;
+      }).join('')}`).join('');
+  }
+  function mobileHubButton() {
+    const hub = game.activeHub;
+    return `<button class="mobile-hub" data-act="hub-menu" aria-label="Switch hub, current hub ${hub.id}" aria-haspopup="true" aria-expanded="${hubMenu}">${icon('hub')}<b class="mono amber">${hub.id}</b><span>${esc(AIRPORT_BY_ID[hub.id].city)}</span><span aria-hidden="true">▾</span></button>`;
+  }
+  function mobilePanelHead(s) {
+    const fleet = tab === 'market', airport = tab === 'airport';
+    return `<div class="mobile-screen-heading"><h2>${fleet ? 'Fleet' : airport ? 'Hub & upgrades' : 'Routes'}</h2>${airport ? '<button class="btn ghost" data-act="mobile-upgrades-back">← Back</button>' : `<button class="btn" data-act="page" data-arg="${fleet ? 'market' : 'finder'}">${fleet ? '+ Buy' : '+ New route'}</button>`}</div>
+      <div class="mobile-scope">${fleet ? `<label><span class="sr-only">Fleet hub</span><select data-act="mobile-fleet-hub" aria-label="Fleet hub"><option value="all" ${mobileFleetHub === 'all' ? 'selected' : ''}>All hubs</option>${s.hubs.map(h => `<option value="${h.id}" ${mobileFleetHub === h.id ? 'selected' : ''}>${h.id} · ${esc(AIRPORT_BY_ID[h.id].city)}</option>`).join('')}</select></label>` : mobileHubButton()}${airport ? '' : `<button class="mobile-filter-toggle" data-act="mobile-filters" data-arg="${fleet ? 'fleet' : 'routes'}" aria-label="More ${fleet ? 'fleet' : 'route'} filters" aria-expanded="${mobileFilters[fleet ? 'fleet' : 'routes']}">${icon('filters')}Filters</button>`}</div>`;
+  }
+  function mobileListControls(s) {
+    if (tab === 'airport') return '';
+    const fleet = tab === 'market', key = fleet ? 'fleet' : 'routes';
+    const entities = fleet ? s.planes.filter(p => mobileFleetHub === 'all' || p.hub === mobileFleetHub) : game.routesAt(s.active);
+    const states = fleet ? null : entities.map(fitOf);
+    const filter = fleet ? fleetFilter : routeFilter;
+    const matches = id => fleet ? entities.filter(p => fleetMatches(game, p, id)).length : states.filter(h => h.matches(id)).length;
+    const quick = fleet ? [['all', 'All'], ['attention', 'Needs attention'], ['parked', 'Parked']] : [['all', 'All'], ['attention', 'Needs attention'], ['demand', 'Demand']];
+    const selected = quick.some(([id]) => id === filter) ? quick : [...quick, (fleet ? FLEET_FILTERS : ROUTE_FILTERS).find(([id]) => id === filter)];
+    return `${searchField(key, fleet ? fleetQuery : routeQuery, fleet ? 'Search aircraft, routes or cities' : 'Search routes or cities')}
+      <div class="mobile-quick-filters">${selected.filter(Boolean).map(([id, label]) => `<button class="chip ${id === filter ? 'on' : ''}" data-act="${fleet ? 'fleet-filter' : 'route-filter'}" data-arg="${id}" aria-pressed="${id === filter}">${label} <span class="mono">${matches(id)}</span></button>`).join('')}</div>
+      ${mobileFilters[key] ? `<div class="mobile-filter-options"><label>Show<select data-act="${fleet ? 'fleet-filter' : 'route-filter'}" aria-label="Filter ${key}">${(fleet ? FLEET_FILTERS : ROUTE_FILTERS).map(([id, label]) => `<option value="${id}" ${filter === id ? 'selected' : ''}>${label} (${matches(id)})</option>`).join('')}</select></label><label>Sort<select data-act="${fleet ? 'fleet-sort' : 'ops-sort'}" aria-label="Sort ${key}">${(fleet ? FLEET_SORTS : OPS_SORTS).map(([id, label]) => `<option value="${id}" ${(fleet ? fleetSort : opsSort) === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${fleet ? '' : `<button class="btn ghost" data-act="autofit" data-arg="${s.active}" ${entities.length ? '' : 'disabled'}>Preview auto-fit</button>`}</div>` : ''}`;
+  }
+  function mobileRoutesHTML(s) {
+    const routes = game.routesAt(s.active), shown = sortRoutes(routes).filter(routeShown);
+    return `<div class="mobile-list-caption"><span>${shown.length} of ${routes.length} routes</span><span>Yesterday’s result</span></div>` + shown.map(r => {
+      const f = fitOf(r), profit = game.routeProfit(r), y = r.yesterday, cargo = game.cargoOnly(r);
+      const load = cargo ? y?.freight?.capacity ? Math.round(y.freight.delivered / y.freight.capacity * 100) : null : y?.seats ? Math.round(y.pax / y.seats * 100) : null;
+      return `<button class="mobile-entity-row" data-act="select-route" data-arg="${r.id}" aria-label="${r.hub} to ${r.dest}, ${esc(AIRPORT_BY_ID[r.dest].city)}, route details"><span class="mobile-entity-top"><b class="mono">${r.hub} <span class="sub">⇄</span> ${r.dest}</b><span class="mono ${profit == null ? 'sub' : signCls(profit)}">${profit == null ? '—' : fmtSigned(profit)}</span></span><span class="mobile-entity-meta"><span>${esc(AIRPORT_BY_ID[r.dest].city)} · ${plural(f.on.length, 'aircraft')}</span><span>${load == null ? 'No data yet' : `${load}% full`}</span></span>${f.issues.length ? `<span class="mobile-entity-warning ${f.issues[0].tone}">${esc(f.issues[0].label)}${f.issues.length > 1 ? ` · +${f.issues.length - 1}` : ''}<span aria-hidden="true">›</span></span>` : ''}</button>`;
+    }).join('') + (!shown.length ? `<div class="empty">${routes.length ? 'No routes match your search and filter.' : `No routes from ${s.active} yet.`}<br><button class="btn ghost" data-act="${routes.length ? 'reset-routes' : 'page'}" data-arg="finder">${routes.length ? 'Show all routes' : 'Find your first route'}</button></div>` : '') + '<p class="note">Profit and load use yesterday’s results. Open a route to manage its aircraft, pricing and service.</p>';
+  }
+  function mobileFleetHTML(s) {
+    const scoped = s.planes.filter(p => mobileFleetHub === 'all' || p.hub === mobileFleetHub);
+    const shown = scoped.filter(planeShown).sort({profit:(a,b) => (a.routeId == null ? -1e12 : a.yday ?? 0) - (b.routeId == null ? -1e12 : b.yday ?? 0), age:(a,b) => b.age-a.age, hub:(a,b) => a.hub.localeCompare(b.hub) || a.id-b.id}[fleetSort]);
+    return `<div class="mobile-list-caption"><span>${shown.length} of ${scoped.length} aircraft</span><span>${mobileFleetHub === 'all' ? 'Across all hubs' : mobileFleetHub}</span></div>` + shown.map(p => {
+      const r = game.route(p.routeId), t = AIRCRAFT[p.type];
+      const status = p.conversion ? 'Converting' : ({out:'In flight', back:'In flight', home:'At gate', turn:'Turnaround', repair:'In repair', idle:'Parked'})[p.phase] || 'At gate';
+      return `<button class="mobile-entity-row" data-act="select-plane" data-arg="${p.id}"><span class="mobile-entity-top"><b>${esc(p.name)}</b><span class="tag ${p.phase === 'repair' ? 'bad' : ''}">${status}</span></span><span class="mobile-entity-meta"><span>${t.name} · ${planeRegistration(p)}</span><span class="mono">${r ? `${r.hub} ⇄ ${r.dest}` : p.hub}</span></span>${fleetFlags(p) ? `<span class="mobile-fleet-flags">${fleetFlags(p)}</span>` : ''}</button>`;
+    }).join('') + (!shown.length ? scoped.length ? fleetEmpty : '<div class="empty">No aircraft here yet. Buy an aircraft or launch a route to get started.</div>' : '');
+  }
+  function mobilePreviewHTML() {
+    const selected = mobilePreview, s = game.state;
+    if (!selected || !s) return '';
+    let title, code, detail, primary = '<button class="btn" data-act="mobile-inspect">View details</button>';
+    if (selected.kind === 'plane') {
+      const p = game.plane(selected.id); if (!p) { mobilePreview = null; return ''; }
+      const r = game.route(p.routeId); code = planeRegistration(p); title = p.name;
+      detail = `${AIRCRAFT[p.type].name} · ${r ? `${r.hub} ⇄ ${r.dest}` : `Parked at ${p.hub}`}`;
+      primary = '<button class="btn" data-act="mobile-inspect">Inspect aircraft</button>';
+    } else if (selected.kind === 'route') {
+      const r = game.route(selected.id); if (!r) { mobilePreview = null; return ''; }
+      code = `${r.hub} ⇄ ${r.dest}`; title = AIRPORT_BY_ID[r.dest].city;
+      detail = `${plural(game.planesOn(r.id).length, 'aircraft')} · ${game.routeProfit(r) == null ? 'No results yet' : `${fmtSigned(game.routeProfit(r))} yesterday`}`;
+      primary = '<button class="btn" data-act="mobile-inspect">View route</button>';
+    } else {
+      const a = AIRPORT_BY_ID[selected.id]; if (!a) { mobilePreview = null; return ''; }
+      const h = game.hub(a.id), r = game.routeTo(s.active, a.id);
+      code = a.id; title = a.city;
+      detail = h ? `${plural(game.routesAt(h.id).length, 'route')} · ${plural(game.planesAt(h.id).length, 'aircraft')} · ${rankFor(h.levels).name}` : `${a.country} · ${km(distKm(AIRPORT_BY_ID[s.active], a))} from ${s.active}`;
+      primary = h ? `<button class="btn" data-act="mobile-hub-manage" data-arg="${h.id}">Manage hub</button><button class="btn ghost" data-act="mobile-inspect">Airport details</button>` : r ? `<button class="btn" data-act="select-route" data-arg="${r.id}">View route</button><button class="btn ghost" data-act="mobile-inspect">Airport details</button>` : `<button class="btn" data-act="mobile-inspect">View airport</button>${!game.whyNotOpen(a.id) ? `<button class="btn ghost" data-act="open-route" data-arg="${a.id}">Plan route</button>` : ''}`;
+    }
+    return `<button class="x" data-act="mobile-preview-close" aria-label="Close map preview">×</button><span class="mobile-preview-code mono amber">${esc(code)}</span><h3>${esc(title)}</h3><p class="sub">${esc(detail)}</p><div class="btn-row">${primary}</div>`;
+  }
+  function renderMobile(s) {
+    const enabled = mobileMedia.matches && !!s;
+    document.body.classList.toggle('mobile-game', enabled);
+    const mapVisible = enabled && !page && !opsOpen && !sel && mobileTab === 'map';
+    document.body.classList.toggle('mobile-map-active', mapVisible);
+    $('#mobile-nav').hidden = !enabled;
+    $('#mobile-map-toolbar').hidden = !mapVisible;
+    $('#mobile-map-tools').hidden = !mapVisible || !mobileTools;
+    $('#mobile-map-preview').hidden = !mapVisible || !mobilePreview;
+    if (!enabled) return;
+    const alerts = operationsAttention(game, 'all').alerts.length;
+    setHTML($('#mobile-nav'), [['map','Map'],['routes','Routes'],['fleet','Fleet'],['operations','Operations'],['more','More']].map(([id,label]) => `<button data-act="mobile-tab" data-arg="${id}" ${id === mobileTab ? 'aria-current="page"' : ''} aria-label="${label}${id === 'operations' && alerts ? `, ${alerts} items need attention` : ''}"><span class="mobile-nav-icon">${icon(id)}${id === 'operations' && alerts ? `<b class="badge" aria-hidden="true">${alerts > 99 ? '99+' : alerts}</b>` : ''}</span><span>${label}</span></button>`).join(''));
+    $('#mobile-nav').inert = !!modal || !$('#view').hidden;
+    setHTML($('#mobile-map-toolbar'), `${mobileHubButton()}<button class="mobile-map-action" data-act="search" aria-label="Search network">${icon('search')}</button><button class="mobile-map-action" data-act="mobile-tools" aria-label="Map controls" aria-expanded="${mobileTools}">${icon('filters')}</button>`);
+    setHTML($('#mobile-map-tools'), `<button class="mobile-menu-row" data-act="map-mode">${icon(map.getMode() === 'globe' ? 'map' : 'globe')}<span>${map.getMode() === 'globe' ? 'Map view' : 'Earth view'}</span></button><button class="mobile-menu-row" data-act="profit-view" aria-pressed="${profitView}">${icon('finance')}<span>${profitView ? 'Hide route profit colors' : 'Color routes by profit'}</span></button><div class="mobile-zoom"><button class="btn ghost" data-act="zoom" data-arg="out" aria-label="Zoom out">−</button><button class="btn ghost" data-act="zoom" data-arg="fit">Whole world</button><button class="btn ghost" data-act="zoom" data-arg="in" aria-label="Zoom in">+</button></div>`);
+    if (mapVisible) { const html = mobilePreviewHTML(); setHTML($('#mobile-map-preview'), html); $('#mobile-map-preview').hidden = !html; }
+    if (!$('#panel').hidden) { setHTML($('#mobile-panel-head'), mobilePanelHead(s)); setHTML($('#mobile-panel-controls'), mobileListControls(s)); }
+    $('#page').classList.toggle('mobile-root-page', page === 'mobile-menu');
+    $('#mobile-page-back').textContent = `← Back to ${backLabel(mobileTab === 'map' ? 'map' : 'More')}`;
+    $('#hud').inert = !!modal || !$('#view').hidden;
+    if (mobileScrollRestore != null) { $('#panel-body').scrollTop = mobileScrollRestore; mobileScrollRestore = null; }
+  }
 
   // ---------- small pieces ----------
   const pips = (level, max) =>
@@ -850,6 +975,16 @@ export function createUI(map, view) {
   }
   function opsOverview(s) {
     const { alerts, groups } = operationsAttention(game, opsHub), cases = responseCases(game, opsHub);
+    if (mobileMedia.matches) {
+      const activeGroups = groups.filter(g => g.count);
+      const routeCount = alerts.filter(a => a.target.kind === 'route').length, planeCount = alerts.filter(a => a.target.kind === 'plane').length;
+      return `<div class="row attention-heading"><div><h3>Needs attention</h3><div class="sub">${plural(alerts.length, 'item')} · live status</div></div></div>
+        <div class="mobile-ops-stats"><div><b class="mono">${routeCount}</b><span>Routes</span></div><div><b class="mono">${planeCount}</b><span>Aircraft</span></div><div><b class="mono">${alerts.length - routeCount - planeCount}</b><span>Other</span></div></div>
+        <button class="btn ghost wide" data-act="response-list">Review disruption responses${cases.routes.length ? ` · ${cases.routes.length}` : ''}</button>
+        ${activeGroups.length ? `<details class="mobile-alert-filters" data-section="mobile-attention"><summary>Filter issues · ${activeGroups.length} categories</summary><div class="chips">${activeGroups.map(g => `<button class="chip" data-act="attention-filter" data-arg="${g.id}">${g.label} · ${g.count}</button>`).join('')}</div></details>` : ''}
+        <div class="section-label">Items to review</div>${alerts.map(a => `<button class="attention-alert ${a.tone}" data-act="alert-open" data-arg="${a.target.kind}:${a.target.id}"><span class="attention-copy"><b>${esc(a.title)}</b><span class="sub">${esc(a.detail)}</span></span><span class="attention-action">${alertTargetLabel(a.target)} ›</span></button>`).join('') || '<div class="empty attention-clear"><b class="good">No active problems here.</b><br>Route advice is available in Routes.</div>'}
+        <p class="note">Resolved problems disappear. Yesterday’s losses update after the next full day.</p>`;
+    }
     return `<div class="row attention-heading"><div><h3>Needs attention</h3><div class="sub">${opsHub === 'all' ? 'Across all hubs' : `At ${opsHub}`} · live status</div></div><span class="sub">${plural(alerts.length, 'item')} to review</span></div>
       <div class="item recovery-summary"><div><b>Disruption management</b><div class="sub">${plural(cases.routes.length, 'disrupted route')} · ${plural(cases.contracts.length, 'contract')} due soon · ${plural(cases.returns.length, 'temporary assignment')}</div></div><button class="btn ghost" data-act="response-list">Review responses</button></div>
       <div class="attention-summary">${groups.map((g) => `<button class="attention-count ${g.count ? 'needs-review' : ''}" data-act="attention-filter" data-arg="${g.id}" aria-label="${g.label}: ${g.count}">
@@ -1279,7 +1414,7 @@ export function createUI(map, view) {
   }
 
   function moreTab() {
-    return `<div class="section-label">Help</div>
+    return `<div class="section-label">App</div><button class="btn ghost wide" data-act="pwa-open">${pwa.getState().updateReady ? 'App update available' : pwa.getState().installed ? 'App & offline play' : 'Install Airport Manager'}</button><div class="section-label">Help</div>
       <div class="btn-row"><button class="btn ghost" data-act="help">How to play</button>
         <button class="btn ghost" data-act="guide-library">Tutorials & lessons</button></div>
       <div class="section-label">Sound</div>
@@ -1304,6 +1439,19 @@ export function createUI(map, view) {
       <button class="btn danger wide" data-act="new-game">Start over</button>`;
   }
 
+  function appModal() {
+    const s = pwa.getState();
+    const offline = s.offlineReady ? 'Ready for offline play' : !s.production ? 'Offline play is available on the published game.' : !s.supported ? 'Open the secure game website in Safari or Chrome to set up offline play.' : 'Preparing offline play. Keep the game open and online until this says Ready.';
+    showModal(`<div data-pwa-panel><div class="row"><div class="eyebrow">Play from your home screen</div><button class="x" data-act="close-modal" aria-label="Close app settings">×</button></div>
+      <div class="pwa-heading"><img src="/icons/airport-manager-192.png" width="64" height="64" alt=""><div><h2>Airport Manager</h2><p class="sub">${s.installed ? 'Running as an app' : 'Your airline, one tap away.'}</p></div></div>
+      ${!s.installed ? `${s.canInstall ? '<button class="btn wide" data-act="pwa-install">Install app</button>' : ''}<div class="section-label">Add to your phone</div><div class="item"><b>iPhone / iPad</b><p class="note">Open the game in Safari. Tap Share (or Menu → Share), then Add to Home Screen. Keep Open as Web App on if shown, then tap Add.</p></div><div class="item"><b>Android</b><p class="note">Open the game in Chrome. Tap Install app above when available, or use the browser menu → Install app / Add to Home screen.</p></div>` : ''}
+      <div class="section-label">Offline play</div><div class="item"><b class="${s.offlineReady ? 'good' : 'sub'}">${offline}</b><p class="note">The game and base maps are saved for offline use. Sharper satellite detail loads online and recent areas are kept as space allows.</p></div>
+      <p class="note">Progress is stored on this device and browser. There is no cloud sync between your phone and computer.</p>
+      ${s.updateReady ? '<div class="item"><b class="amber">An update is ready</b><p class="note">Apply it when you’re ready. Your game is saved before the app restarts.</p></div>' : ''}
+      ${s.message ? `<p class="note" role="status">${esc(s.message)}</p>` : ''}</div>
+      <div class="btn-row"><button class="btn ghost" data-act="close-modal">Back to game</button>${s.updateReady ? `<button class="btn" data-act="pwa-update" ${s.updating ? 'disabled' : ''}>${s.updating ? 'Updating…' : 'Save & update'}</button>` : s.offlineReady ? `<button class="btn ghost" data-act="pwa-check" ${s.checking ? 'disabled' : ''}>${s.checking ? 'Checking…' : 'Check for updates'}</button>` : ''}</div>`);
+  }
+
   function tutorialSeen() { try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return false; } }
   function tutorialMenu() {
     tutorialBrowse = true;
@@ -1325,7 +1473,7 @@ export function createUI(map, view) {
     if (go === 'ops-routes') return opsOpen && opsView === 'routes';
     if (go === 'ops-fleet') return opsOpen && opsView === 'aircraft';
     if (go === 'results') return opsOpen && opsView === 'results';
-    if (go === 'upgrades') return !page && !opsOpen && !sel && tab === 'airport';
+    if (go === 'upgrades') return !page && !opsOpen && !sel && tab === 'airport' && (!mobileMedia.matches || mobileTab !== 'map');
     if (go === 'plane') return !page && !opsOpen && sel?.kind === 'plane';
     if (['route-overview', 'route-fare', 'watch'].includes(go)) return !page && !opsOpen && cardRouteId() === tutorialRoute(game.state)?.id && routePane === (go === 'route-fare' ? 'fare' : 'overview');
     if (go === 'history') return page === 'company' && companyPane === 'history';
@@ -1390,7 +1538,7 @@ export function createUI(map, view) {
     const parent = modal ? $('#modal') : document.body;
     if (guide.parentElement !== parent) parent.append(guide);
     if ($('#guide-status').parentElement !== parent) parent.append($('#guide-status'));
-    const t = ensureTutorial(s), collapsed = t.collapsed;
+    const t = ensureTutorial(s), collapsed = mobileMedia.matches ? !mobileGuideExpanded : t.collapsed;
     guide.classList.toggle('collapsed', collapsed);
     if (guideFinished && !current) {
       setGuideHTML(`<div class="guide-head"><b>✓ ${esc(LESSON_BY_ID[guideFinished].title)} complete</b><button class="x" data-act="guide-dismiss" aria-label="Dismiss lesson completion">×</button></div><div class="guide-copy"><p>Keep building at your own pace. Optional lessons are always available in Menu → Tutorials.</p></div><div class="guide-actions"><button class="btn" data-act="guide-library">Choose another lesson</button><button class="btn ghost" data-act="guide-dismiss">Keep exploring</button></div>`);
@@ -1441,7 +1589,7 @@ export function createUI(map, view) {
       ${sec('Hub specializations', 'In Upgrades, compare Budget, Premium, Transfer and Cargo roles. Requirements show your progress toward unlocking each. Review the conversion fee, operating costs and route-by-route forecast before committing for 14 days. Benefits depend on your routes and service choices; fees and trade-offs stay in force. Each hub has its own role, and older saves start as General purpose.')}
       ${sec('Leasing and repeat work', 'Lease an aircraft from Fleet or while planning a route. Review the setup fee, daily rent and minimum term before confirming. Finance tracks remaining rent; Fleet and Operations flag leases in their final three days. Finish a client’s first charter to unlock a three-week agreement in Contracts. Each week pays separately and only traffic on the named route counts.')}
       ${sec('Service frequency', 'Open a route’s Fare & cabin section to preview Economy, Balanced or Frequent service. Economy waits for fuller aircraft; Frequent leaves sooner and attracts extra regular demand. Review estimated departures and profit before applying; actual flights depend on loads and disruptions.')}
-      ${sec('On a phone', 'Expand panel gives the route or fleet list more room. Split view brings the map back; Show map folds the list down to its tabs. Tap a tab to reopen it. Route details have Overview, Aircraft, and Fare & cabin sections. The Back button and the main route action stay visible while you scroll, and Back restores the list where you left it.')}
+      ${sec('On a phone', 'Use the bottom navigation for Map, Routes, Fleet, Operations and More. Tap an airport or aircraft on the map for a short preview, then open its details. Routes and Fleet have search and attention filters; Filters opens every filter and sorting choice. More contains hub upgrades, finance, contracts and tutorials. Route details have Overview, Aircraft, and Fare & cabin sections. Back restores your previous list and scroll position. Tap the tutorial strip to expand or collapse instructions.')}
       ${sec('Keys', '/ Search, O Operations, A every aircraft, F route finder, C contracts, N news, K calendar, R rivals, B finance, G goals, P profit view, E Earth view, S sound, H this help.')}
       ${sec('Time', 'Space pauses; 1, 2 and 3 set the speed. Leave the game running and it keeps earning at a quarter pace for up to four hours.')}
       </div>
@@ -1864,6 +2012,7 @@ export function createUI(map, view) {
     }).join('');
     return `<div class="eyebrow">Airport Manager</div><h1>Build an airport the world flies through.</h1>
       <button class="item clickable intro-tutorial" data-act="guide-library"><span class="intro-tutorial-icon" aria-hidden="true">${icon('learn')}</span><span><strong>Tutorials</strong><span class="sub">New here? Start with a guided first flight, or explore the other lessons.</span></span><span class="intro-tutorial-arrow" aria-hidden="true">›</span></button>
+      <button class="btn ghost wide" data-act="pwa-open">${pwa.getState().installed ? 'App & offline play' : 'Install on your phone'}${pwa.getState().updateReady ? ' · Update available' : ''}</button>
       <div class="section-label" style="margin-top:12px">Difficulty</div>
       <div class="seg wide">${Object.entries(DIFFICULTY).map(([id, d]) => `<button class="${diff === id ? 'on' : ''}" data-act="diff" data-arg="${id}">${d.name}</button>`).join('')}</div>
       <div class="note" style="margin-bottom:12px">${DIFFICULTY[diff].desc} Scenarios with their own budget keep it, and the daily challenge is always played on normal.</div>
@@ -1974,6 +2123,7 @@ export function createUI(map, view) {
   function showModal(html, pause = true) {
     const s = game.state;
     if (!modal) modalFocus = document.activeElement;
+    if (mobileMedia.matches) mobileGuideExpanded = false;
     modal = { resume: pause && s ? (modal?.resume ?? s.speed) : null }; // a dialog opened over another keeps the original speed
     if (pause && s) s.speed = 0;
     $('#modal-box').innerHTML = html;
@@ -1990,7 +2140,7 @@ export function createUI(map, view) {
     $('#modal-box').classList.toggle('tutorial-box', tutorialBrowse);
     $('#modal-box').classList.toggle('project-catalog', projectReview?.mode==='list');
     const box = $('#modal-box');
-    const actionRow = (aircraftReview || aircraftPicker || launch || commercialReview || disruptionReview || partnershipReview || cargoReview || projectReview || campaignReview || companyReview || tutorialBrowse) && [...box.children].reverse().find((el) => el.matches('.btn-row, .card-actions, button.btn'));
+    const actionRow = (box.querySelector('[data-pwa-panel]') || aircraftReview || aircraftPicker || launch || commercialReview || disruptionReview || partnershipReview || cargoReview || projectReview || campaignReview || companyReview || tutorialBrowse) && [...box.children].reverse().find((el) => el.matches('.btn-row, .card-actions, button.btn'));
     box.classList.toggle('has-scroll', !!actionRow);
     if (actionRow) {
       const body = document.createElement('div'), footer = document.createElement('div');
@@ -2000,6 +2150,7 @@ export function createUI(map, view) {
       box.append(body, footer);
     }
     $('#modal').hidden = false;
+    if (mobileMedia.matches) { $('#mobile-nav').inert = true; $('#hud').inert = true; }
     renderGuide(s);
     $('#modal-box').querySelector('button:not(:disabled)')?.focus();
   }
@@ -2014,6 +2165,7 @@ export function createUI(map, view) {
     tutorialBrowse = false;
     searchOpen = false;
     $('#modal').hidden = true;
+    if (mobileMedia.matches) { $('#mobile-nav').inert = false; $('#hud').inert = false; }
     renderGuide(game.state);
     if (modalFocus?.isConnected) modalFocus.focus();
   }
@@ -2272,10 +2424,12 @@ export function createUI(map, view) {
   }
 
   // ---------- render ----------
-  const TAB_HTML = { company: companyTab, airport: airportTab, routes: routesTab, market: fleetTab, finder: finderTab, log: logTab, contracts: contractsTab, finance: financeTab, calendar: calendarTab, rivals: rivalsTab, goals: goalsTab, more: moreTab, learn: lessonsTab };
+  const TAB_HTML = { company: companyTab, airport: airportTab, routes: routesTab, market: fleetTab, finder: finderTab, log: logTab, contracts: contractsTab, finance: financeTab, calendar: calendarTab, rivals: rivalsTab, goals: goalsTab, more: moreTab, learn: lessonsTab, 'mobile-menu': mobileMenuHTML };
 
   function render() {
     const s = game.state;
+    if (!mobileMedia.matches && page === 'mobile-menu') page = null;
+    document.body.classList.toggle('mobile-game', mobileMedia.matches && !!s);
     if (s && sel?.kind === 'plane' && !game.plane(sel.id)) { sel = null; tab = 'market'; map.setSelected(null); }
     if (dragging != null) { hud(); return; } // redrawing would pull the aircraft out from under the pointer
     $('#hud').hidden = !s;
@@ -2306,16 +2460,13 @@ export function createUI(map, view) {
 
     const card = cardHTML();
     $('#card').hidden = !card || !!page || opsOpen;
-    $('#panel').hidden = !s || opsOpen || (window.innerWidth <= 760 && (!!page || !!card));
+    $('#panel').hidden = !s || opsOpen || (mobileMedia.matches && (!!page || !!card || mobileTab === 'map' || mobileTab === 'more' && tab !== 'airport'));
     setHTML($('#card'), card);
     $('#card').classList.toggle('has-body', !!$('#card-body'));
     $('#card').classList.toggle('route-detail', !!$('#card .route-tabs'));
     $('#card').dataset.routePane = routePane;
-    const fullMobilePanel = window.innerWidth <= 760 && window.innerHeight <= 600
-      && ((!$('#card').hidden && $('#card').classList.contains('has-body')) || (!$('#panel').hidden && $('#panel').classList.contains('expanded') && !$('#panel').classList.contains('collapsed')));
-    $('#hud').inert = window.innerWidth <= 760 && (!!page || opsOpen || fullMobilePanel);
-    map.setFree(freeRect());
-    if (!s) { renderGuide(s); return; }
+    $('#hud').inert = mobileMedia.matches && (!!modal || !$('#view').hidden);
+    if (!s) { renderGuide(s); renderMobile(s); map.setFree(freeRect()); return; }
     document.documentElement.style.setProperty('--brand', companyColor(s));
     document.title = `${s.company.name} · Airport Manager`;
 
@@ -2366,7 +2517,12 @@ export function createUI(map, view) {
     const tip = currentTip(s);
     const coach = currentLesson(s) ? '' : tip ? tipHTML(tip) : esc(coachText(s));
     // Don't rebuild the panel under an open dropdown.
-    if (document.activeElement?.tagName !== 'SELECT') setHTML($('#panel-body'), `${coach ? `<div id="coach" class="${tip ? 'tutorial' : ''}">${coach}</div>` : ''}${TAB_HTML[tab](s)}`);
+    if (document.activeElement?.tagName !== 'SELECT') {
+      const mobile = mobileMedia.matches;
+      const content = mobile && tab === 'routes' ? mobileRoutesHTML(s) : mobile && tab === 'market' ? mobileFleetHTML(s) : TAB_HTML[tab](s);
+      const advice = coach ? `<div id="coach" class="${tip ? 'tutorial' : ''}">${coach}</div>` : '';
+      setHTML($('#panel-body'), mobile ? content + advice : advice + content);
+    }
 
     if (s.speed) resumeSpeed = s.speed;
     setHTML($('#speeds'), `<div class="speed-presets">${SPEEDS.map((v) => `<button data-act="speed" data-arg="${v}" class="${s.speed === v ? 'on' : ''}" aria-pressed="${s.speed === v}" aria-label="${v ? `Speed ${v}x` : 'Pause'}" data-tip="${v ? `Run at ${v}× speed` : 'Pause the game · Space'}">${v ? `${v}×` : icon('pause')}</button>`).join('')}</div>
@@ -2379,6 +2535,8 @@ export function createUI(map, view) {
     setHTML($('#hud-events'), activeEvents(s).filter((e) => !(e.type === 'strike' && e.settled))
       .map((e) => `<span style="color:${EVENT_TYPES[e.type].color}" data-tip="${esc(describe(e).title)}">${EVENT_TYPES[e.type].icon}</span>`).join(''));
     hud();
+    renderMobile(s);
+    map.setFree(freeRect());
     refreshTip();
   }
 
@@ -2423,6 +2581,7 @@ export function createUI(map, view) {
     backStack.length = 0; routeQuery = ''; fleetQuery = ''; finderQuery = ''; finderMarket = 'all'; finderKind = 'passenger'; networkQuery = '';
     game.newGame(homeId, modeId, tutorial ? 'easy' : diff);
     pendingMode = null; tab = 'routes'; page = null; pick = null; addFor = null; opsOpen = false; contractReview = null; board.length = 0; profitView = false; map.setProfitView(false); overShown = false; guideFinished = null;
+    mobileTab = 'map'; mobilePreview = null; mobileTools = false; mobileFleetHub = 'all'; mobileGuideExpanded = false;
     if (tutorial || !tutorialSeen()) startLesson(game.state, 'first-flight');
     if (tutorial) game.state.speed = 0;
     game.save();
@@ -2434,6 +2593,10 @@ export function createUI(map, view) {
   const pair = (arg) => arg.split(':');
 
   const actions = {
+    'pwa-open': () => appModal(),
+    'pwa-install': () => { void pwa.install(); },
+    'pwa-check': () => { void pwa.check(); },
+    'pwa-update': () => { closeModal(); void pwa.applyUpdate().then(ok => { if (!ok) appModal(); }); },
     'company-event': key => {const entry=game.state.company.timeline.find(e=>e.key===key),target=entry && companyEventTarget(game,entry);if(target)return actions['alert-open'](`${target.kind}:${target.id}`);},
     'company-pane': id => {companyPane=id;},
     'company-filter': id => {historyFilter=id;historyLimit=25;},
@@ -2503,7 +2666,16 @@ export function createUI(map, view) {
       const c=disruptionReview && responseContext(game,disruptionReview.target)?.contract; if (!c) return;
       closeModal(); game.setActive(c.hub); startLaunch(c.dest);
     },
-    tab: (arg) => { backStack.length = 0; tab = arg; page = null; sel = null; opsOpen = false; map.setSelected(null); $('#panel').classList.remove('collapsed'); },
+    'mobile-tab': mobileNavigate,
+    'mobile-tools': () => { mobileTools = !mobileTools; hubMenu = false; },
+    'mobile-filters': key => { if (key in mobileFilters) mobileFilters[key] = !mobileFilters[key]; },
+    'mobile-fleet-hub': id => { if (id === 'all' || game.isHub(id)) { mobileFleetHub = id; $('#panel-body').scrollTop = 0; } },
+    'mobile-preview-close': () => { mobilePreview = null; map.setSelected(null); },
+    'mobile-inspect': () => { if (mobilePreview) select({ ...mobilePreview }); },
+    'mobile-upgrades': () => { rememberView(); mobileTab = 'more'; mobilePreview = null; page = null; sel = null; opsOpen = false; tab = 'airport'; map.setSelected(null); },
+    'mobile-upgrades-back': () => { if (!returnToView()) mobileNavigate('more'); },
+    'mobile-hub-manage': id => { rememberView(); game.setActive(id); mobileTab = 'more'; mobilePreview = null; page = null; sel = null; opsOpen = false; tab = 'airport'; map.setSelected(null); },
+    tab: (arg) => { backStack.length = 0; tab = arg; mobileTab = arg === 'routes' ? 'routes' : arg === 'market' ? 'fleet' : 'more'; mobilePreview = null; page = null; sel = null; opsOpen = false; map.setSelected(null); $('#panel').classList.remove('collapsed'); },
     page: (arg) => { if (page === arg) { if (!returnToView()) page = null; return; } rememberView(); page = arg; contractReview = null; navOpen = false; opsOpen = false; calDay = null; calMonth = null; $('#page-body').scrollTop = 0; },
     'close-page': () => { if (returnToView()) return; if (contractReview && page === 'contracts') actions['contract-review-back'](); else page = null; },
     'detail-back': () => { if (!returnToView()) select(null); },
@@ -2526,11 +2698,12 @@ export function createUI(map, view) {
       const t = ensureTutorial(game.state);
       if (!startLesson(game.state, id, t.completed.includes(id) && !t.progress[id])) return;
       closeModal(); actions['close-view'](); guideFinished = null; page = null; sel = null; opsOpen = false; tab = 'routes'; map.setSelected(null); $('#panel').classList.remove('collapsed');
+      mobileTab = 'routes'; mobilePreview = null; mobileGuideExpanded = true;
       if (id !== 'first-flight') guideGo();
       game.save();
     },
     'guide-restart': id => { if (startLesson(game.state, id, true)) actions['guide-start'](id); },
-    'guide-go': () => guideGo(),
+    'guide-go': () => { guideGo(); if (mobileMedia.matches) mobileGuideExpanded = false; },
     'guide-speed': () => { if (!modal) game.setSpeed(game.state.speed === 10 ? 0 : game.state.speed ? 10 : 1); },
     'guide-next': () => {
       const id = ensureTutorial(game.state).active;
@@ -2538,8 +2711,8 @@ export function createUI(map, view) {
       if (!game.state.tutorial.active) { guideFinished = id; try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch {} }
       game.save();
     },
-    'guide-collapse': () => { const t = ensureTutorial(game.state); t.collapsed = !t.collapsed; game.save(); },
-    'guide-pause': () => { ensureTutorial(game.state).active = null; game.save(); try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch {} toast({text: 'Lesson paused. Resume from Menu → Tutorials.', kind: 'good'}); },
+    'guide-collapse': () => { if (mobileMedia.matches) { mobileGuideExpanded = !mobileGuideExpanded; return; } const t = ensureTutorial(game.state); t.collapsed = !t.collapsed; game.save(); },
+    'guide-pause': () => { ensureTutorial(game.state).active = null; game.save(); try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch {} toast({text: `Lesson paused. Resume from ${mobileMedia.matches ? 'More' : 'Menu'} → Tutorials.`, kind: 'good'}); },
     'guide-dismiss': () => { guideFinished = null; },
     help: () => helpModal(),
     sheet: () => { $('#panel').classList.toggle('collapsed'); },
@@ -2567,7 +2740,7 @@ export function createUI(map, view) {
       if (why) { specializationModal(); return why; }
       closeModal();
     },
-    'specialization-upgrades': (hubId) => { closeModal(); select(null); game.setActive(hubId); page = null; opsOpen = false; tab = 'airport'; $('#panel').classList.remove('collapsed'); },
+    'specialization-upgrades': (hubId) => { closeModal(); select(null); game.setActive(hubId); page = null; opsOpen = false; tab = 'airport'; mobileTab = 'more'; $('#panel').classList.remove('collapsed'); },
     'lease-review': (arg) => { const [hubId, typeId, route] = pair(arg); commercialReview = { kind: 'lease', hubId, typeId, routeId: route ? +route : null, days: 14 }; commercialModal(); },
     'lease-term': (arg) => { if (commercialReview?.kind === 'lease') { commercialReview.days = +arg; commercialModal(); } },
     'lease-action': (arg) => { const [action, id] = pair(arg); commercialReview = { kind: 'leaseAction', action, id: +id }; commercialModal(); },
@@ -2644,7 +2817,7 @@ export function createUI(map, view) {
       if (!['overhaul', 'replace', 'type'].includes(action.kind)) toast({ text: `${aircraftTitles[action.kind]} applied`, kind: 'good', target: action.kind === 'sell' ? null : { kind: 'plane', id: action.id } });
     },
     ops: (arg) => { backStack.length = 0; navOpen = false; hubMenu = false; opsOpen = true; opsView = 'overview'; opsHub = game.state.hubs.length > 1 && !arg ? 'all' : arg || game.state.active; addFor = null; page = null; sel = null; contractReview = null; map.setSelected(null); $('#ops-body').scrollTop = 0; },
-    'ops-close': () => { if (!returnToView()) { opsOpen = false; addFor = null; } },
+    'ops-close': () => { if (!returnToView()) { opsOpen = false; addFor = null; if (mobileMedia.matches) mobileNavigate('map'); } },
     'ops-view': (arg) => { opsView = arg; $('#ops-body').scrollTop = 0; },
     autofit: (arg) => autoFitModal(arg),
     'autofit-apply': (arg) => { const why = game.applyAutoFit(arg); closeModal(); pick = null; return why; },
@@ -2750,7 +2923,7 @@ export function createUI(map, view) {
     'compact-speed': (arg) => { resumeSpeed = +arg; if (game.state.speed) game.setSpeed(resumeSpeed); },
     zoom: (arg) => (arg === 'fit' ? map.fit() : map.zoomBy(arg === 'in' ? 1.6 : 1 / 1.6)),
     mute: () => { audio.toggle(); },
-    'map-mode': () => { map.setMode(map.getMode() === 'globe' ? 'flat' : 'globe'); },
+    'map-mode': () => { map.setMode(map.getMode() === 'globe' ? 'flat' : 'globe'); mobileTools = false; },
     share: () => share(),
     mode: (arg) => {
       const sc = SCENARIOS.find((x) => x.id === arg);
@@ -2781,7 +2954,7 @@ export function createUI(map, view) {
     render();
   });
   document.addEventListener('change', (e) => {
-    const control = e.target.closest('select[data-act="route-filter"], select[data-act="ops-sort"], select[data-act="fleet-filter"], select[data-act="compact-speed"], select[data-act="finder-market"], select[data-act="response-route"], select[data-act="response-plane"], select[data-act="response-type"]');
+    const control = e.target.closest('select[data-act="route-filter"], select[data-act="ops-sort"], select[data-act="fleet-sort"], select[data-act="mobile-fleet-hub"], select[data-act="fleet-filter"], select[data-act="compact-speed"], select[data-act="finder-market"], select[data-act="response-route"], select[data-act="response-plane"], select[data-act="response-type"]');
     if (control) { actions[control.dataset.act](control.value); control.blur(); render(); return; }
     const el = e.target.closest('select[data-act="assign"]');
     if (!el) return;
@@ -2847,6 +3020,15 @@ export function createUI(map, view) {
   });
 
   window.addEventListener('resize', render);
+  pwa.subscribe(() => {
+    render();
+    if (modal && $('#modal-box [data-pwa-panel]')) appModal();
+  });
+  mobileMedia.addEventListener('change', e => {
+    if (!e.matches && mobilePreview) { sel = mobilePreview; mobilePreview = null; map.setSelected(sel); }
+    render();
+    if (e.matches && game.state && !page && !sel && !opsOpen && mobileTab === 'map') map.focus(game.state.active, 3);
+  });
   game.on('toast', toast);
   game.on('change', render);
   game.on('choice', strikeModal);
@@ -2966,7 +3148,7 @@ export function createUI(map, view) {
 
   let lastSlow = 0;
   return {
-    select, hover, render, offlineModal,
+    select: selectFromMap, hover, render, offlineModal,
     // Called every frame: cheap HUD refresh often, full panel refresh about once a second.
     frame(now) {
       if (now - lastSlow > 1000) { lastSlow = now; render(); } else hud();

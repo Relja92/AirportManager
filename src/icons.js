@@ -1,5 +1,12 @@
 // Small, consistent line icons for the header and its labelled menu.
 const paths = {
+  install: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 6v9m-3-3 3 3 3-3M10 19h4"/>',
+  map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2Zm6-2v16m6-14v16"/>',
+  routes: '<circle cx="5" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 5h9a4 4 0 0 1 0 8H8a3 3 0 0 0 0 6h9"/>',
+  fleet: '<path d="m3 14 8-3V4a1 1 0 0 1 2 0v7l8 3v2l-8-1v4l3 2H8l3-2v-4l-8 1Z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+  filters: '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="16" cy="17" r="2"/>',
+  hub: '<path d="M9 21V10L5 7V3h14v4l-4 3v11M8 21h8M5 6h14m-7-3v7"/>',
   learn: '<path d="m2 8 10-5 10 5-10 5Zm4 2v7c4 3 8 3 12 0v-7M22 8v9"/>',
   company: '<path d="m3 14 8-3V4a1 1 0 0 1 2 0v7l8 3v2l-8-1v4l3 2H8l3-2v-4l-8 1Z"/>',
   operations: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',

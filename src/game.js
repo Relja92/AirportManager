@@ -214,9 +214,9 @@ export const game = {
   },
 
   save() {
-    if (!this.state) return;
+    if (!this.state) return true;
     this.state.savedAt = Date.now();
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.state)); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.state)); return true; } catch { return false; }
   },
 
   reset() {

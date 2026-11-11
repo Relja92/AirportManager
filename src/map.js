@@ -11,6 +11,7 @@ import { companyColor, companySoft, companyInk } from './company.js';
 import { rivalHubIds } from './rivals.js';
 import { createNightLights, spherePoint } from './nightLights.js';
 import { createEarthTerrain } from './earthTerrain.js';
+import { wheelGesture, panGlobe } from './mapGestures.js';
 
 const W = 2000, H = 1000; // world units the projection is fitted to
 const C = {
@@ -262,11 +263,18 @@ export function createMap(canvas, { onPick, onHover }) {
   canvas.addEventListener('pointerleave', () => { hovered = null; onHover(null); });
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    const gesture = wheelGesture(e, window.innerWidth <= 760);
+    if (!gesture) return;
     tween = null; gtween = null;
-    const [px, py] = local(e);
-    const speed = e.ctrlKey ? 0.012 : 0.0018; // ctrlKey = trackpad pinch
-    if (mode === 'globe') gzoom(Math.exp(-e.deltaY * speed));
-    else zoomAt(px, py, Math.exp(-e.deltaY * speed));
+    if (gesture.kind === 'pan') {
+      if (mode === 'globe') panGlobe(globe, gesture.dx, gesture.dy, gframe().R);
+      else { view.x += gesture.dx; view.y += gesture.dy; clampView(); }
+    } else {
+      const [px, py] = local(e);
+      if (mode === 'globe') gzoom(gesture.factor);
+      else zoomAt(px, py, gesture.factor);
+    }
+    hovered = null; onHover(null);
   }, { passive: false });
   window.addEventListener('resize', resize);
   resize();

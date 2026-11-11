@@ -2,6 +2,7 @@ import { game, MIN_PER_SEC } from './game.js';
 import { createMap } from './map.js';
 import { createAirportView } from './airportView.js';
 import { createUI } from './ui.js';
+import { pwa } from './pwa.js';
 
 let ui;
 const map = createMap(document.getElementById('map'), {
@@ -10,6 +11,7 @@ const map = createMap(document.getElementById('map'), {
 });
 const view = createAirportView(document.getElementById('view-canvas'));
 ui = createUI(map, view);
+pwa.init({ save: () => game.save() });
 
 if (game.load()) {
   const away = game.catchUp();

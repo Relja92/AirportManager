@@ -2,8 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#060b12" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Airport Manager" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Airport Manager</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -11,6 +15,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/mobile.css" />
   </head>
   <body>
     <canvas id="map"></canvas>
@@ -56,6 +61,8 @@
     </header>
 
     <aside id="panel" hidden>
+      <div id="mobile-panel-head" class="mobile-only"></div>
+      <div id="mobile-panel-controls" class="mobile-only"></div>
       <nav id="tabs"></nav>
       <div id="panel-tools" class="panel-tools"></div>
       <div id="panel-body"></div>
@@ -63,7 +70,7 @@
 
     <div id="nav-menu" hidden></div>
     <aside id="page" hidden>
-      <div class="page-head"><h2 id="page-title"></h2><button class="x" data-act="close-page" aria-label="Close">×</button></div>
+      <div class="page-head"><button id="mobile-page-back" class="mobile-only detail-back" data-act="close-page">← Back</button><h2 id="page-title"></h2><button class="x" data-act="close-page" aria-label="Close">×</button></div>
       <div id="page-body"></div>
     </aside>
     <section id="ops" hidden>
@@ -71,6 +78,10 @@
       <div id="ops-body"></div>
     </section>
     <div id="hub-menu" hidden></div>
+    <div id="mobile-map-toolbar" class="mobile-only" hidden></div>
+    <div id="mobile-map-tools" class="mobile-only" hidden></div>
+    <aside id="mobile-map-preview" class="mobile-only" aria-label="Map selection" hidden></aside>
+    <nav id="mobile-nav" class="mobile-only" aria-label="Main navigation" hidden></nav>
     <section id="card" hidden></section>
     <aside id="intro" hidden></aside>
     <div id="board" hidden></div>

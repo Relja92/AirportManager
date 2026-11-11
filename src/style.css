@@ -46,6 +46,9 @@
   .passenger-details summary, .airport-market > summary { padding-block: 10px; }
 }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pwa-heading { display: flex; gap: 14px; align-items: center; margin: 18px 0; }
+.pwa-heading img { flex: none; border-radius: 14px; }
+.pwa-heading h2 { font-size: 23px; }
 .list-search { display: flex; position: relative; max-width: 450px; margin: 10px 0; }
 .list-search label { display: block; width: 100%; }
 .list-search input { width: 100%; min-width: 0; background: rgba(255,255,255,.025); color: var(--text); border: 1px solid var(--line-strong); border-radius: 7px; padding: 9px 34px 9px 10px; font: 13px var(--sans); }
