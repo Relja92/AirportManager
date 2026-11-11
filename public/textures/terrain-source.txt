@@ -1,0 +1,32 @@
+Earth terrain — NASA Blue Marble Next Generation, August 2004
+
+Source: NASA Earth Observatory, with shaded topography and bathymetry.
+https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/
+Retrieved: 2026-11-11. A satellite composite, not live observations.
+
+Native 500 m source: eight 21600 x 21600 geographic RGB images, A1 through D2.
+The full geographic raster is 86400 x 43200 pixels. North is at the top;
+longitude spans -180 to +180, latitude +90 to -90.
+Exact source URLs and SHA-256 hashes are recorded in terrain-tiles/source.json.
+
+tools/build_terrain.py creates a local four-level pyramid:
+level 0: 10800 x 5400 (4 km); level 1: 21600 x 10800 (2 km);
+level 2: 43200 x 21600 (1 km); level 3: 86400 x 43200 (native 500 m).
+Each tile has 1350 x 1350 content pixels plus a one-pixel gutter containing
+real neighboring image data. Longitude wraps; latitude clamps at the poles.
+Lower levels use LANCZOS downsampling. RGB JPEG quality 90, no chroma subsampling.
+No artificial sharpening, generated terrain, or upscaled detail is used.
+
+earth-day.jpg (8192 x 4096) and earth-day-mobile.jpg (4096 x 2048) are
+overview textures derived from NASA's 21600 x 10800 global image:
+https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x10800.jpg
+
+The renderer loads only the visible region, with four concurrent requests
+and at most twenty-five color tiles in GPU memory (sixteen on mobile,
+fewer on older devices).
+Detail fades in over the overview. Existing color treatment, atmosphere,
+night shading and warm city lights are applied separately and retained.
+
+NASA media usage guidelines:
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+No endorsement is implied.

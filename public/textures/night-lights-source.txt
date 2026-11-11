@@ -1,0 +1,44 @@
+Earth at night — NASA Black Marble 2016 (grayscale, lights only)
+
+Source: NASA Earth Observatory / NASA Goddard Space Flight Center.
+Observations: Suomi NPP Visible Infrared Imaging Radiometer Suite (VIIRS), 2016.
+This is a cloud-free satellite composite, not live or current-year observations.
+
+Dataset and downloads:
+https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/
+Original image:
+https://assets.science.nasa.gov/content/dam/science/esd/eo/images/imagerecords/144000/144897/BlackMarble_2016_3km_gray.jpg
+Original dimensions: 13500 x 6750, geographic/equirectangular.
+Bounds: -180 to +180 longitude, +90 to -90 latitude (north at the top).
+Original SHA-256: 3fbc8aae3529dc1ebfcf3aa9361bd3dfc11d19950a6af6d8ed2df61bd8b0134d
+Retrieved: 2026-11-11.
+
+Local assets, downsampled with macOS sips, JPEG quality 90:
+earth-night.jpg — 8192 x 4096, desktop.
+earth-night-mobile.jpg — 4096 x 2048, mobile.
+Close-zoom source: NASA's original 500 m grayscale tiles A1 through D2.
+Each source tile is 21600 x 21600; the global raster is 86400 x 43200.
+Exact source URLs and SHA-256 hashes: night-tiles/source.json.
+Retrieved: 2026-11-11.
+
+night-tiles/{level}/{column}-{row}.jpg — a geographic detail pyramid:
+level 0: 21600 x 10800 global (2 km), level 1: 43200 x 21600 (1 km),
+level 2: 86400 x 43200 (native 500 m).
+Each tile contains 1350 x 1350 source pixels and one actual neighboring pixel
+on every edge. Longitude wraps and latitude clamps at the world boundaries.
+Empty tiles are recorded in the manifest and require no download.
+Generated with tools/build_night_lights.py using Pillow, LANCZOS for the two
+lower resolutions, and grayscale JPEG quality 95. No upscaling, artificial
+sharpening or synthesized lights are applied.
+
+The renderer selects a complete visible region at the finest level that fits
+a bounded single-channel texture atlas (at most 36 tiles, fewer on older GPUs).
+Only four images download at a time; the small overview remains available
+while detail arrives. Desktop and mobile use the same close-zoom imagery.
+The renderer applies a warm tint, suppresses near-black compression noise, and
+smoothly fades the observed light intensity with the game's simulated sunlight.
+No settlements or connecting roads have been synthesized.
+
+Media usage guidelines:
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+NASA imagery is acknowledged as source material; no endorsement is implied.

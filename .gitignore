@@ -1,0 +1,23 @@
+# Dependencies and generated output
+/node_modules/
+/dist/
+/coverage/
+/reports/
+
+# Local deployment, editor, and assistant settings
+/.vercel/
+/.claude/
+/.codex/
+/.agents/
+/.idea/
+/.vscode/
+
+# Local secrets, logs, and operating-system files
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc

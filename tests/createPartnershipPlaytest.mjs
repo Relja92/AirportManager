@@ -1,0 +1,11 @@
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {setupPartnership} from './partnershipFixture.mjs';
+const store={};globalThis.localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v};
+const {game}=await import('../src/game.js');
+const {s,rv}=setupPartnership(game);s.tips=['contract','rep','rivalWeak','hub2','value'];s.speed=0;
+const dir=new URL('../reports/partnerships-pass/',import.meta.url);await mkdir(dir,{recursive:true});
+const save=async name=>{s.report=null;s.logSeen=s.logN;s.savedAt=Date.now();s.speed=0;await writeFile(new URL(`${name}.json`,dir),JSON.stringify(s));};
+await save('offer');game.applyPartnership(rv.id,'reciprocal');
+while(s.day<26)game.tick(10);s.contracts=[];await save('active');
+const html=(await readFile(new URL('../index.html',import.meta.url),'utf8')).replace('<script type="module" src="/src/main.js"></script>',`<script type="module">const kind=new URLSearchParams(location.search).get('state')==='active'?'active':'offer';const state=await(await fetch('./'+kind+'.json')).json();state.savedAt=Date.now();localStorage.setItem('airport-manager-save-v2',JSON.stringify(state));localStorage.setItem('airport-manager-tutorial-seen','1');localStorage.setItem('airport-manager-weekly-off','1');await import('/src/main.js');</script>`);
+await writeFile(new URL('playtest.html',dir),html);console.log({day:s.day,rep:s.rep,stats:s.partnerships.agreements[0].total});

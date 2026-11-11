@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#060b12" />
+    <title>Airport Manager</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="map"></canvas>
+
+    <header id="hud" hidden>
+      <div class="hud-status">
+      <button class="hud-block hud-airport" data-act="hub-menu" aria-label="Switch hub" aria-haspopup="true" data-tip="The hub you are looking at. Click to switch hubs, compare them, or open an airport’s close-up.">
+        <span class="code" id="hud-code"></span>
+        <span class="hub-copy">
+          <span class="hud-title" id="hud-name"></span>
+          <span class="hud-sub" id="hud-rank"></span>
+        </span>
+        <span class="caret" aria-hidden="true">▾</span>
+      </button>
+      <button class="hud-block hud-cash" data-act="page" data-arg="finance" aria-label="Finance" data-tip="Finance · cash in the bank and today’s running profit. Key: B">
+        <div class="hud-label">Cash</div>
+        <div class="hud-value" id="hud-money"></div>
+        <span class="mobile-today"><span id="hud-today-compact"></span> today</span>
+      </button>
+      <div class="hud-block hud-daily" data-tip="Income minus costs since midnight. Airport upkeep, maintenance and interest are charged at the end of the day, so the final figure is lower.">
+        <div class="hud-label">Today</div>
+        <div class="hud-value small" id="hud-today"></div>
+      </div>
+      <button class="hud-block hud-date" data-act="page" data-arg="calendar" aria-label="Open calendar" data-tip="The date and time in the game. Click for the calendar of coming events. Symbols next to the time are events happening today.">
+        <div class="hud-label" id="hud-day"></div>
+        <div class="hud-value small"><span id="hud-time"></span><span id="hud-events"></span></div>
+      </button>
+      <button class="hud-block hud-goal" data-act="page" data-arg="goals" aria-label="Open goals" data-tip="Goals pay cash when you reach them. Click to see them all.">
+        <div class="hud-label" id="hud-goal-label"></div>
+        <div class="hud-goal-text" id="hud-goal"></div>
+      </button>
+      </div>
+      <div class="hud-controls">
+        <div class="hud-actions">
+          <button class="header-action" id="operations-btn" data-act="ops" data-arg="" aria-label="Operations" aria-keyshortcuts="O" data-tip="Operations · needs attention, routes, aircraft and results. Key: O"><span data-icon="operations"></span><span class="nav-label">Operations</span></button>
+          <nav id="nav" aria-label="Company screens"></nav>
+          <button class="header-action" id="news-btn" data-act="page" data-arg="log" aria-label="News" data-tip="News · recent announcements. Key: N"><span data-icon="log"></span><b class="badge" id="news-badge" aria-hidden="true" hidden></b></button>
+          <button class="header-action" id="search-btn" data-act="search" aria-label="Search network" aria-keyshortcuts="/" data-tip="Search · cities, routes and aircraft. Key: /"><span data-icon="search"></span></button>
+          <button class="header-action" id="nav-toggle" data-act="nav" aria-label="Menu" aria-haspopup="true" aria-controls="nav-menu" data-tip="Menu · all company screens and help"><span data-icon="more"></span></button>
+        </div>
+        <div class="speeds" id="speeds" role="group" aria-label="Simulation speed"></div>
+      </div>
+    </header>
+
+    <aside id="panel" hidden>
+      <nav id="tabs"></nav>
+      <div id="panel-tools" class="panel-tools"></div>
+      <div id="panel-body"></div>
+    </aside>
+
+    <div id="nav-menu" hidden></div>
+    <aside id="page" hidden>
+      <div class="page-head"><h2 id="page-title"></h2><button class="x" data-act="close-page" aria-label="Close">×</button></div>
+      <div id="page-body"></div>
+    </aside>
+    <section id="ops" hidden>
+      <div class="page-head"><h2>Operations</h2><div class="btn-row"><button class="btn ghost small" data-act="search">Search</button><button class="btn ghost small" id="ops-back" data-act="ops-close">Back to map</button></div></div>
+      <div id="ops-body"></div>
+    </section>
+    <div id="hub-menu" hidden></div>
+    <section id="card" hidden></section>
+    <aside id="intro" hidden></aside>
+    <div id="board" hidden></div>
+
+    <button id="profit-toggle" data-act="profit-view" aria-label="Colour routes by profit" data-tip="Colours every route line on the map by yesterday’s result: green earned money, red lost it, grey has no data yet." hidden></button>
+    <button id="mode-toggle" data-act="map-mode" aria-label="Switch between map and Earth view"></button>
+
+    <div id="zoom">
+      <button data-act="zoom" data-arg="in" aria-label="Zoom in">+</button>
+      <button data-act="zoom" data-arg="out" aria-label="Zoom out">−</button>
+      <button data-act="zoom" data-arg="fit" aria-label="Show whole world">◎</button>
+    </div>
+
+    <div id="view" hidden>
+      <div class="view-box">
+        <div class="view-head">
+          <span id="view-title"></span>
+          <button class="x" data-act="close-view" aria-label="Close airport view">×</button>
+        </div>
+        <canvas id="view-canvas" width="760" height="440"></canvas>
+        <div class="view-legend" id="view-legend"></div>
+      </div>
+    </div>
+
+    <div id="modal" hidden role="dialog" aria-modal="true" aria-label="Game dialog"><div class="modal-box" id="modal-box"></div></div>
+    <aside id="guide" hidden aria-label="Tutorial guide"></aside>
+    <div id="guide-status" class="sr-only" role="status" aria-live="polite"></div>
+    <div id="toasts"></div>
+    <div id="tooltip" hidden></div>
+    <div id="tip" role="tooltip" hidden></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

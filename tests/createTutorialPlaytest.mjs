@@ -1,0 +1,20 @@
+// Isolated browser fixtures; never load these into a player's normal origin.
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
+globalThis.localStorage = {getItem:()=>null, setItem:()=>{}};
+const {game} = await import('../src/game.js');
+const {startLesson} = await import('../src/tutorial.js');
+game.silent = true; game.newGame('LHR');
+const s = game.state;
+s.speed = 0; s.events = []; s.eventsUntil = 1e9; s.rivals = []; s.rng = 12345;
+startLesson(s, 'first-flight');
+const dir = new URL('../reports/tutorial-pass/', import.meta.url); await mkdir(dir, {recursive:true});
+await writeFile(new URL('fresh.json', dir), JSON.stringify(s));
+game.launchRoute('LHR', 'CDG', {mode:'new', typeId:'sparrow'});
+s.money = 28e6; s.hubs[0].levels = {runway:3, terminal:3, gates:3, amenities:1, cargo:2, fuel:1, marketing:1};
+s.tutorial.active = null; s.tutorial.progress = {}; s.tutorial.completed = ['first-flight'];
+await writeFile(new URL('ready.json', dir), JSON.stringify(s));
+const html = (await readFile(new URL('../index.html', import.meta.url), 'utf8')).replace('<script type="module" src="/src/main.js"></script>', `<script type="module">const kind=new URLSearchParams(location.search).get('state')==='ready'?'ready':'fresh';const state=await(await fetch('./'+kind+'.json')).json();state.savedAt=Date.now();localStorage.setItem('airport-manager-save-v2',JSON.stringify(state));localStorage.setItem('airport-manager-tutorial-seen','1');localStorage.setItem('airport-manager-weekly-off','1');await import('/src/main.js');</script>`);
+await writeFile(new URL('playtest.html', dir), html);
+const welcome = (await readFile(new URL('../index.html', import.meta.url), 'utf8')).replace('<script type="module" src="/src/main.js"></script>', `<script type="module">localStorage.removeItem('airport-manager-save-v2');localStorage.removeItem('airport-manager-save-v1');localStorage.removeItem('airport-manager-tutorial-seen');await import('/src/main.js');</script>`);
+await writeFile(new URL('welcome.html', dir), welcome);
+console.log('Created isolated tutorial fixtures.');
