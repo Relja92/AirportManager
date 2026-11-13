@@ -23,6 +23,7 @@ import { FREIGHT_SERVICES, freightService, freightHold } from './cargo.js';
 import { PARTNERSHIP_TERMS, PARTNERSHIP_DAYS, agreementActive } from './partnerships.js';
 import { rivalLeaseCommitment } from './rivalCommercial.js';
 import { MARKET_PROFILES } from './data/markets.js';
+import { WORLD_MILESTONES, CONTINENT_BONUS, milestoneName } from './worldCoverage.js';
 import { PASSENGERS, PASSENGER_KEYS, passengerTotal } from './passengers.js';
 import { liveIncidents, contractDeadline, responseCases, responseContext, responseTargets, responseAircraft, responseQuote, disruptionForecast, contractOutlook } from './disruptions.js';
 import { LESSONS, LESSON_BY_ID, ensureTutorial, startLesson, currentLesson, tutorialRoute, observeTutorial, canAdvanceLesson, nextLessonStep, lessonWhy } from './tutorial.js';
@@ -75,6 +76,7 @@ const TIPS = [
 
 // Plain-words explanations shown when the pointer rests on (or a finger taps) a term.
 const GLOSSARY = {
+  coverage: 'The long mission: put every airport on the map on your network. An airport counts when it is one of your hubs or any of your routes ends there. Milestones pay cash, and each continent you cover completely adds 3% demand on every route.',
   demand: 'How many people want to fly this route each day, in each direction. It depends on the size of the city, the distance, your fare, the season, events, rivals, reputation and transfer passengers.',
   waiting: 'Passengers at the gate right now, each way. The route’s service policy sets the minimum load and longest wait after turnaround.',
   fare: 'What one economy ticket costs. 100% is the standard fare for the distance. Cheaper fills more seats and is good for reputation; dearer earns more per seat but fewer people fly.',
@@ -160,6 +162,8 @@ export function createUI(map, view) {
   let overShown = false;
   let resumeSpeed = 1;
   let hubMenu = false;
+  let finderNew = false; // only airports no hub of yours serves yet
+  let coverView = false; // map highlights airports not yet on the network
   let finderSort = 'profit', finderClear = false, finderMarket = 'all', finderKind = 'passenger';
   let profitView = false;
   let fleetSort = 'profit';
@@ -413,7 +417,7 @@ export function createUI(map, view) {
     setHTML($('#mobile-nav'), [['map','Map'],['routes','Routes'],['fleet','Fleet'],['operations','Operations'],['more','More']].map(([id,label]) => `<button data-act="mobile-tab" data-arg="${id}" ${id === mobileTab ? 'aria-current="page"' : ''} aria-label="${label}${id === 'operations' && alerts ? `, ${alerts} items need attention` : ''}"><span class="mobile-nav-icon">${icon(id)}${id === 'operations' && alerts ? `<b class="badge" aria-hidden="true">${alerts > 99 ? '99+' : alerts}</b>` : ''}</span><span>${label}</span></button>`).join(''));
     $('#mobile-nav').inert = !!modal || !$('#view').hidden;
     setHTML($('#mobile-map-toolbar'), `${mobileHubButton()}<button class="mobile-map-action" data-act="search" aria-label="Search network">${icon('search')}</button><button class="mobile-map-action" data-act="mobile-tools" aria-label="Map controls" aria-expanded="${mobileTools}">${icon('filters')}</button>`);
-    setHTML($('#mobile-map-tools'), `<button class="mobile-menu-row" data-act="map-mode">${icon(map.getMode() === 'globe' ? 'map' : 'globe')}<span>${map.getMode() === 'globe' ? 'Map view' : 'Earth view'}</span></button><button class="mobile-menu-row" data-act="profit-view" aria-pressed="${profitView}">${icon('finance')}<span>${profitView ? 'Hide route profit colors' : 'Color routes by profit'}</span></button><div class="mobile-zoom"><button class="btn ghost" data-act="zoom" data-arg="out" aria-label="Zoom out">−</button><button class="btn ghost" data-act="zoom" data-arg="fit">Whole world</button><button class="btn ghost" data-act="zoom" data-arg="in" aria-label="Zoom in">+</button></div>`);
+    setHTML($('#mobile-map-tools'), `<button class="mobile-menu-row" data-act="map-mode">${icon(map.getMode() === 'globe' ? 'map' : 'globe')}<span>${map.getMode() === 'globe' ? 'Map view' : 'Earth view'}</span></button><button class="mobile-menu-row" data-act="profit-view" aria-pressed="${profitView}">${icon('finance')}<span>${profitView ? 'Hide route profit colors' : 'Color routes by profit'}</span></button><button class="mobile-menu-row" data-act="world-view" aria-pressed="${coverView}">${icon('globe')}<span>${coverView ? 'Hide network coverage' : 'Show unserved airports'}</span></button><div class="mobile-zoom"><button class="btn ghost" data-act="zoom" data-arg="out" aria-label="Zoom out">−</button><button class="btn ghost" data-act="zoom" data-arg="fit">Whole world</button><button class="btn ghost" data-act="zoom" data-arg="in" aria-label="Zoom in">+</button></div>`);
     if (mapVisible) { const html = mobilePreviewHTML(); setHTML($('#mobile-map-preview'), html); $('#mobile-map-preview').hidden = !html; }
     if (!$('#panel').hidden) { setHTML($('#mobile-panel-head'), mobilePanelHead(s)); setHTML($('#mobile-panel-controls'), mobileListControls(s)); }
     $('#page').classList.toggle('mobile-root-page', page === 'mobile-menu');
@@ -722,6 +726,7 @@ export function createUI(map, view) {
     const total = rows.length;
     rows = rows.filter((x) => airportMatches(x.a, finderQuery));
     if (finderClear) rows = rows.filter((x) => !x.e.rivals.length);
+    if (finderNew) rows = rows.filter((x) => !game.isServed(x.a.id));
     if (finderMarket !== 'all') rows = rows.filter((x) => x.a.market.id === finderMarket);
     const by = {
       profit: (x, y) => y.e.best.profit - x.e.best.profit, demand: (x, y) => y.e.total - x.e.total,
@@ -754,9 +759,10 @@ export function createUI(map, view) {
       <div class="seg service-options" aria-label="Route business">${[['passenger','Passenger'],['cargo','Freight']].map(([id,label])=>`<button data-act="finder-kind" data-arg="${id}" class="${finderKind===id?'on':''}" aria-pressed="${finderKind===id}">${label}</button>`).join('')}</div>
       ${finderKind==='cargo' && !hub.levels.cargo ? '<p class="why amber">Build a cargo terminal at this hub to plan freight routes.</p>' : ''}
       ${searchField('finder', finderQuery, 'Search destinations')}<label class="market-filter">Airport market<select data-act="finder-market" aria-label="Airport market"><option value="all" ${finderMarket === 'all' ? 'selected' : ''}>All markets</option>${Object.entries(MARKET_PROFILES).map(([id, m]) => `<option value="${id}" ${finderMarket === id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></label><div class="chips">${FINDER_SORTS.map(([id, name]) => `<button class="chip ${finderSort === id ? 'on' : ''}" data-act="finder-sort" data-arg="${id}">${name}</button>`).join('')}
-        <button class="chip ${finderClear ? 'on' : ''}" data-act="finder-clear">No rivals</button></div>
-      ${list || (total && (finderQuery || finderClear || finderMarket !== 'all') ? '<div class="empty">No destinations match your search and filter.<br><button class="btn ghost small" data-act="reset-finder">Show all destinations</button></div>' : '<div class="empty">No new destinations in range. A longer runway reaches further.</div>')}
-      <div class="note">${finderQuery || finderClear || finderMarket !== 'all' ? `${rows.length} of ${total} destinations match. ` : ''}${rows.length > 40 ? `Showing the best 40 of ${rows.length}. ` : ''}${total} airports are in range. Profit is an estimate for one new aircraft of the type shown ${finderKind==='cargo'?'with Bulk freight, including expected deadline penalties':'at the standard fare'}, after its upkeep. Select a destination name to inspect it on the map.</div>`;
+        <button class="chip ${finderClear ? 'on' : ''}" data-act="finder-clear">No rivals</button>
+        <button class="chip ${finderNew ? 'on' : ''}" data-act="finder-new" data-tip="Only airports that none of your hubs serves yet. Each one counts toward connecting the world.">New to your network</button></div>
+      ${list || (total && (finderQuery || finderClear || finderNew || finderMarket !== 'all') ? '<div class="empty">No destinations match your search and filter.<br><button class="btn ghost small" data-act="reset-finder">Show all destinations</button></div>' : '<div class="empty">No new destinations in range. A longer runway reaches further.</div>')}
+      <div class="note">${finderQuery || finderClear || finderNew || finderMarket !== 'all' ? `${rows.length} of ${total} destinations match. ` : ''}${rows.length > 40 ? `Showing the best 40 of ${rows.length}. ` : ''}${total} airports are in range. Profit is an estimate for one new aircraft of the type shown ${finderKind==='cargo'?'with Bulk freight, including expected deadline penalties':'at the standard fare'}, after its upkeep. Select a destination name to inspect it on the map.</div>`;
   }
 
   // ---------- contracts and reputation ----------
@@ -1359,13 +1365,29 @@ export function createUI(map, view) {
       ${why?`<p class="why amber">${esc(why)}</p>`:''}<div class="btn-row"><button class="btn ghost" data-act="close-modal">${page==='company' && companyPane==='history'?'Back to history':'Back to game'}</button>
       ${complete?'':!active?`<button class="btn" data-act="campaign-start" data-arg="${id}" ${why?'disabled':''}>${run?'Resume campaign':current?'Switch campaign':'Start campaign'}</button>`:ready?`<button class="btn" data-act="campaign-claim" data-arg="${id}:${run.chapter}" ${why?'disabled':''}>${next?'Claim & next chapter':'Finish campaign'} · ${fmtMoney(chapter.reward)}</button>`:`<button class="btn ghost" data-act="campaign-pause" data-arg="${id}">Pause campaign</button>`}</div>`);
   }
+  // The long mission: how much of the map is on your network, by continent, and what the next milestone pays.
+  function worldSummary(s) {
+    const w = game.worldProgress();
+    const rows = w.continents.map((c) => `<div class="world-row"><span>${c.name}${c.full ? ' <span class="good">✓</span>' : ''}</span><span class="meter"><i style="width:${(c.served / c.total) * 100}%;${c.full ? 'background:var(--good)' : ''}"></i></span><span class="mono">${c.served} / ${c.total}</span></div>`).join('');
+    const steps = WORLD_MILESTONES.map((m) => {
+      const done = s.worldDone.includes(m.n);
+      return `<div class="item goal ${done ? 'done' : ''}"><span class="tick"></span><div><div class="name">${milestoneName(m)}</div><div class="sub">Reward ${fmtMoney(m.reward)}${!done && w.next === m ? ` · ${m.n - w.served} to go` : ''}</div></div></div>`;
+    }).join('');
+    return `<div class="section-label"><span>${term('Connect the world', 'coverage')}</span><span>${w.served} / ${w.total} airports</span></div>
+      <div class="item"><div class="meter"><i style="width:${(w.served / w.total) * 100}%"></i></div>
+        <div class="world-rows">${rows}</div>
+        <div class="sub" style="margin-top:8px">${w.full ? `${plural(w.full, 'continent')} fully covered: demand ${pct(w.bonus)} on every route.` : `Cover a whole continent for +${Math.round(CONTINENT_BONUS * 100)}% demand on every route, once per continent.`}</div>
+        <button class="btn ghost wide" style="margin-top:8px" data-act="world-view">${coverView ? 'Hide coverage on the map' : 'Show unserved airports on the map'}</button></div>
+      ${steps}`;
+  }
+
   function goalsTab(s) {
     const sc = game.scenario();
     const box = sc.goal ? `<div class="section-label"><span>${sc.name}</span><span>Day ${Math.min(s.day + 1, sc.deadline)} of ${sc.deadline}</span></div>
       <div class="item"><div class="name">${sc.goal}</div>
       <div class="meter"><i style="width:${Math.min(100, (s.day / sc.deadline) * 100)}%"></i></div>
       ${sc.id === 'daily' ? kv('Net worth so far', fmtMoney(game.netWorth()), 'mono') : ''}</div>` : '';
-    return `${box}${campaignSummary(s)}<div class="section-label"><span>Goals</span><span>${s.goalsDone.length} / ${GOALS.length}</span></div>` +
+    return `${box}${campaignSummary(s)}${worldSummary(s)}<div class="section-label"><span>Goals</span><span>${s.goalsDone.length} / ${GOALS.length}</span></div>` +
       GOALS.map((g) => `<div class="item goal ${s.goalsDone.includes(g.id) ? 'done' : ''}">
         <span class="tick"></span>
         <div><div class="name">${g.title}</div><div class="sub">Reward ${fmtMoney(g.reward)}</div></div>
@@ -1576,6 +1598,7 @@ export function createUI(map, view) {
       ${sec('Partnerships', 'In Rivals, review a 28-day agreement with an airline that connects to your staffed network. Choose reciprocal or partner-favored revenue shares; up to two agreements can be active. Partners reserve 20% of economy seats on shared legs. Your flights use their normal cabin capacity. Referral payments happen only after the onward flight lands. The onward operator pays missed-connection compensation; you cover the claim if the partner closes. End an agreement to stop new bookings; existing journeys retain their terms. Renew in the last three days. Partners still compete on direct routes but do not start new fare wars during an active agreement.')}
       ${sec('Rivals', 'Six airlines run paid aircraft networks and can expand into multiple hubs. Each earns revenue and pays fuel, maintenance and airport costs. They adjust fares, service frequency and cabins, compare owned and leased aircraft, and invest in hub specializations and required facilities. Lease rent and conversion costs come from their own reserves. At expiry they buy a replacement, renew a sustainable lease, or withdraw. They still abandon loss-making markets and invest surplus cash. Hard rivals plan more frequently, examine more opportunities and keep larger reserves. Their hubs and routes show on the map.')}
       ${sec('Taking a rival down', 'Rival hubs are occupied while their airline operates. Competitive services can reduce their earnings, but profitable routes elsewhere can support recovery. Sustained losses and depleted reserves may trigger a takeover offer for its hubs, routes and aircraft. Ten days of negative cash closes the airline; a new entrant may arrive later.')}
+      ${sec('Connecting the world', 'Goals tracks how many of the map’s airports are on your network, by continent. Milestones at 25, 50, 100, 200, 300 and every airport pay cash, and each fully covered continent lifts demand on all routes by 3%. Coverage view (W) highlights the airports you don’t serve yet, and the route finder can list only those.')}
       ${sec('Hubs', 'Once a hub is a Regional Airport you can buy another airport as a hub. Link hubs with a route and each feeds passengers to the other.')}
       ${sec('Money', 'Loans and investors give cash now at a cost later. Five days in a row below zero ends the game.')}
       ${sec('Fuel and price wars', 'The fuel price drifts from day to day; Finance shows it and lets you lock a price for 30 days. A route that earns well can draw a rival in with introductory fares. After twelve days it reviews profitability and reserves. It may withdraw, or remain as a lasting competitor.')}
@@ -1681,6 +1704,7 @@ export function createUI(map, view) {
     if (Math.abs(f.rep - 1) > 0.005) parts.push('reputation affects each passenger group differently');
     if (f.specialization && f.specialization !== 1) parts.push(`hub role ${pct(f.specialization)} regular demand`);
     if (f.charter > 0.5) parts.push(`contract +${Math.round(f.charter)} a day`);
+    if (f.world > 1.001) parts.push(`${term('world coverage', 'coverage')} ${pct(f.world)}`);
     return parts.length ? `<div class="note">${parts.join(' · ')}</div>` : '';
   }
   const rivalLine = (f) => (f.rivals.length
@@ -2440,6 +2464,11 @@ export function createUI(map, view) {
     if (!s) setHTML($('#intro'), introHTML());
     map.setShowRivals(!!s && page === 'rivals');
     $('#mode-toggle').textContent = map.getMode() === 'globe' ? 'Map view' : 'Earth view';
+    $('#world-toggle').hidden = !s;
+    $('#world-toggle').classList.toggle('on', coverView);
+    setHTML($('#world-toggle'), coverView && s
+      ? `Coverage · ${game.worldProgress().served} of ${game.worldProgress().total} <span class="legend"><i style="background:#8fd3ff"></i>not served yet <i style="background:${companyColor(s)}"></i>served</span>`
+      : 'Coverage view');
     $('#profit-toggle').hidden = !s;
     $('#profit-toggle').classList.toggle('on', profitView);
     setHTML($('#profit-toggle'), profitView
@@ -2580,7 +2609,7 @@ export function createUI(map, view) {
     companyPane='profile';historyFilter='all';historyLimit=25;
     backStack.length = 0; routeQuery = ''; fleetQuery = ''; finderQuery = ''; finderMarket = 'all'; finderKind = 'passenger'; networkQuery = '';
     game.newGame(homeId, modeId, tutorial ? 'easy' : diff);
-    pendingMode = null; tab = 'routes'; page = null; pick = null; addFor = null; opsOpen = false; contractReview = null; board.length = 0; profitView = false; map.setProfitView(false); overShown = false; guideFinished = null;
+    pendingMode = null; tab = 'routes'; page = null; pick = null; addFor = null; opsOpen = false; contractReview = null; board.length = 0; profitView = false; map.setProfitView(false); coverView = false; map.setCoverView(false); overShown = false; guideFinished = null;
     mobileTab = 'map'; mobilePreview = null; mobileTools = false; mobileFleetHub = 'all'; mobileGuideExpanded = false;
     if (tutorial || !tutorialSeen()) startLesson(game.state, 'first-flight');
     if (tutorial) game.state.speed = 0;
@@ -2687,7 +2716,7 @@ export function createUI(map, view) {
     },
     'reset-routes': () => { routeFilter = 'all'; routeQuery = ''; },
     'reset-fleet': () => { fleetFilter = 'all'; fleetQuery = ''; },
-    'reset-finder': () => { finderQuery = ''; finderClear = false; finderMarket = 'all'; },
+    'reset-finder': () => { finderQuery = ''; finderClear = false; finderNew = false; finderMarket = 'all'; },
     'finder-kind': kind => {finderKind=kind;},
     'finder-market': (id) => { finderMarket = MARKET_PROFILES[id] ? id : 'all'; },
     'show-results': () => { rememberView(); opsOpen = true; opsView = 'results'; opsHub = game.state.active; page = null; sel = null; map.setSelected(null); $('#ops-body').scrollTop = 0; },
@@ -2723,6 +2752,8 @@ export function createUI(map, view) {
     'hub-quiet': (arg) => game.setActive(arg), // switch hub without moving the map
     'finder-sort': (arg) => { finderSort = arg; },
     'finder-clear': () => { finderClear = !finderClear; },
+    'finder-new': () => { finderNew = !finderNew; },
+    'world-view': () => { coverView = !coverView; map.setCoverView(coverView); },
     // Jump to a contract's airport, with the hub it was offered to as the active one.
     'contract-show': (arg) => {
       const c = game.state.contracts.find((x) => x.id === +arg);
@@ -3012,6 +3043,7 @@ export function createUI(map, view) {
     else if (e.key === 'Escape' && (opsOpen || pick != null)) { if (pick != null) pick = null; else actions['ops-close'](); render(); }
     else if (e.key.toLowerCase() === 'a') { actions.ops(''); opsView = 'aircraft'; render(); }
     else if (e.key.toLowerCase() === 'p') { actions['profit-view'](); render(); }
+    else if (e.key.toLowerCase() === 'w') { actions['world-view'](); render(); }
     else if (e.key.toLowerCase() === 'e') { actions['map-mode'](); render(); }
     else if (e.key.toLowerCase() === 's') { toast({ text: audio.toggle() ? 'Sound off' : 'Sound on' }); render(); }
     else if (e.key.toLowerCase() === 'h' || e.key === '?') helpModal();

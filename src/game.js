@@ -18,6 +18,7 @@ import { connectionActions } from './connections.js';
 import { projectActions, projectEffects } from './projects.js';
 import { campaignActions } from './campaigns.js';
 import { companyActions } from './company.js';
+import { worldActions } from './worldCoverage.js';
 import { cargoActions, freightService, freightHold } from './cargo.js';
 import { partnershipActions } from './partnerships.js';
 import { ensureTutorial } from './tutorial.js';
@@ -104,6 +105,7 @@ export const game = {
   ...projectActions,
   ...campaignActions,
   ...companyActions,
+  ...worldActions,
   state: null,
   silent: false, // true while fast-forwarding offline time
   _rev: 0,
@@ -147,7 +149,7 @@ export const game = {
       today: freshLedger(), yesterday: null, history: [],
       totalPax: 0, flights: 0, bestDay: 0, goalsDone: [], negDays: 0, over: null, savedAt: Date.now(),
       rep: 50, contracts: [], contractsDone: 0, clients: {},
-      fuel: 1, fuelHist: [1], fuelLock: null, log: [], achDone: [], streak: 0, listed: null, report: null, weekRep: 50, weekPax: 0, warsWon: 0, tips: [], logN: 0, logSeen: 0, takeovers: 0, rivalsDown: 0,
+      fuel: 1, fuelHist: [1], fuelLock: null, log: [], achDone: [], streak: 0, listed: null, report: null, weekRep: 50, weekPax: 0, warsWon: 0, tips: [], logN: 0, logSeen: 0, takeovers: 0, rivalsDown: 0, worldDone: [],
     };
     const rand = () => this.rand();
     s.rivals = createRivals(s, rand);
@@ -173,7 +175,7 @@ export const game = {
       for (const h of s.hubs) for (const k of UPGRADE_KEYS) h.levels[k] ??= UPGRADES[k].start;
       s.rep ??= 50; s.contracts ??= []; s.contractsDone ??= 0;
       s.managementChanges ??= []; s.nextChangeId ??= 0;
-      s.fuel ??= 1; s.fuelHist ??= [1]; s.fuelLock ??= null; s.log ??= []; s.achDone ??= []; s.streak ??= 0; s.listed ??= null; s.report ??= null; s.weekRep ??= s.rep; s.weekPax ??= s.totalPax; s.warsWon ??= 0; s.diff ??= 'normal'; s.tips ??= []; s.logN ??= 0; s.logSeen ??= 0; s.takeovers ??= 0; s.rivalsDown ??= 0;
+      s.fuel ??= 1; s.fuelHist ??= [1]; s.fuelLock ??= null; s.log ??= []; s.achDone ??= []; s.streak ??= 0; s.listed ??= null; s.report ??= null; s.weekRep ??= s.rep; s.weekPax ??= s.totalPax; s.warsWon ??= 0; s.diff ??= 'normal'; s.tips ??= []; s.logN ??= 0; s.logSeen ??= 0; s.takeovers ??= 0; s.rivalsDown ??= 0; s.worldDone ??= [];
       for (const rv of s.rivals) { rv.str ??= 100; rv.base ??= 1; }
       addLateRivals(s); // saves from when there were only three airlines get the others as new arrivals
       migrateCommercial(s);
@@ -300,7 +302,8 @@ export const game = {
     const specialization = this.specializationDemand(this.hub(hubId), price, cabin, service);
     const rep = this.repFactor();
     const charter = this.charterDemand(destId, hubId), serviceFactor = serviceOf({ service }).demand;
-    const base = 55 * difficultyOf(s).demand * dest.size * hubF * trunk * event * comp.share * specialization / (1 + km / 9000);
+    const world = this.worldFactor(); // a little extra everywhere for each continent you cover completely
+    const base = 55 * difficultyOf(s).demand * dest.size * hubF * trunk * event * comp.share * specialization * world / (1 + km / 9000);
     const passengers = passengerMarket({ from: AIRPORT_BY_ID[hubId], to: dest, base, price, service, cabin, season,
       reputation: rep, readiness: readiness ?? this.routeReadiness(hubId, destId), connection: 0, charter, role: this.hub(hubId).specialization });
     const connecting = connections ? this.connectionDemand({hub:hubId,dest:destId,price,service,cabin}) : 0;
@@ -308,7 +311,7 @@ export const game = {
     passengers.total += connecting;
     passengers.businessShare = passengers.total ? passengers.segments.business * passengers.businessPreference / passengers.total : 0;
     const connect = 1 + connecting / Math.max(1, passengers.total - connecting);
-    return { km, season, event, share: comp.share, rivals: comp.names, connect, rep, charter, trunk, specialization, transfer,
+    return { km, season, event, share: comp.share, rivals: comp.names, connect, rep, charter, trunk, specialization, transfer, world,
       service: serviceFactor, war: comp.war, ...passengers };
   },
   routeFactors(route) {
@@ -1494,6 +1497,7 @@ export const game = {
       this.recordCompanyEvent(`achievement:${a.id}`, 'milestones', a.title, a.desc);
       this.emit('toast', { text: `Achievement: ${a.title}`, kind: 'goal', sound: 'goal' });
     }
+    this.checkWorld();
   },
 
   checkScenario(dayStart) {

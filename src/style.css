@@ -362,7 +362,20 @@ select {
   border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12px; font-weight: 600;
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-#mode-toggle:hover, #profit-toggle:hover { border-color: var(--amber); color: var(--amber); }
+#mode-toggle:hover, #profit-toggle:hover, #world-toggle:hover { border-color: var(--amber); color: var(--amber); }
+#world-toggle {
+  position: fixed; right: 12px; bottom: 212px; z-index: 4; padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12px; font-weight: 600;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+#world-toggle.on { border-color: var(--amber); color: var(--amber); }
+#world-toggle .legend { display: block; margin-top: 4px; font-weight: 400; font-size: 11px; color: var(--muted); }
+#world-toggle .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin: 0 4px 0 6px; }
+#world-toggle .legend i:first-child { margin-left: 0; }
+.world-rows { margin-top: 10px; display: grid; gap: 5px; }
+.world-row { display: grid; grid-template-columns: 112px 1fr 62px; align-items: center; gap: 8px; font-size: 12.5px; }
+.world-row .meter { margin: 0; }
+.world-row .mono { text-align: right; color: var(--muted); }
 @media (max-width: 760px) { #mode-toggle { bottom: auto; top: 118px; right: 6px; } }
 #profit-toggle {
   position: fixed; right: 12px; bottom: 172px; z-index: 4; padding: 8px 12px; border-radius: 8px; cursor: pointer;
@@ -566,8 +579,9 @@ button.hud-block:hover { background: rgba(255, 255, 255, 0.04); }
   #zoom, #board { display: none; }
   #mode-toggle { bottom: auto; top: calc(var(--hud-bottom) + 8px); right: 6px; padding: 7px 10px; }
   #profit-toggle { bottom: auto; top: calc(var(--hud-bottom) + 48px); right: 6px; padding: 7px 10px; }
+  #world-toggle { bottom: auto; top: calc(var(--hud-bottom) + 88px); right: 6px; padding: 7px 10px; }
   /* the card takes the top of a phone screen; the view buttons would sit on it */
-  #card:not([hidden]) ~ #profit-toggle, #card:not([hidden]) ~ #mode-toggle { display: none; }
+  #card:not([hidden]) ~ #profit-toggle, #card:not([hidden]) ~ #mode-toggle, #card:not([hidden]) ~ #world-toggle { display: none; }
   #toasts { bottom: auto; top: calc(var(--hud-bottom) + 8px); }
   .btn, .chip, .seg button, select { min-height: 38px; }
   .stepper button { width: 34px; height: 34px; }
@@ -720,7 +734,8 @@ button.hud-goal:hover .hud-goal-text, button.hud-goal.on .hud-goal-text { color:
 @media (min-width: 761px) {
   #card:not([hidden]) ~ #zoom,
   #card:not([hidden]) ~ #mode-toggle,
-  #card:not([hidden]) ~ #profit-toggle { right: 364px; }
+  #card:not([hidden]) ~ #profit-toggle,
+  #card:not([hidden]) ~ #world-toggle { right: 364px; }
   #card:not([hidden]) ~ #board { display: none; }
 }
 @media (max-width: 760px) {
@@ -735,7 +750,8 @@ button.hud-goal:hover .hud-goal-text, button.hud-goal.on .hud-goal-text { color:
   #panel, #panel.route-list-mode { height: min(56dvh, calc(100dvh - var(--hud-bottom) - 14px)); overflow: hidden; bottom: max(6px, env(safe-area-inset-bottom)); }
   #panel.expanded:not(.collapsed) { top: calc(var(--hud-bottom) + 8px); height: auto; }
   #panel.expanded:not(.collapsed):not([hidden]) ~ #mode-toggle,
-  #panel.expanded:not(.collapsed):not([hidden]) ~ #profit-toggle { display: none; }
+  #panel.expanded:not(.collapsed):not([hidden]) ~ #profit-toggle,
+  #panel.expanded:not(.collapsed):not([hidden]) ~ #world-toggle { display: none; }
   #panel.collapsed, #panel.route-list-mode.collapsed { top: auto; height: 46px; }
   #panel.collapsed .panel-tools { display: none; }
   #tabs button { min-height: 44px; }
@@ -1121,6 +1137,7 @@ button.hud-goal:hover .hud-goal-text, button.hud-goal.on .hud-goal-text { color:
   .has-guide #zoom { bottom:calc(var(--guide-space) + 12px); }
   .has-guide #mode-toggle { bottom:calc(var(--guide-space) + 132px); }
   .has-guide #profit-toggle { bottom:calc(var(--guide-space) + 172px); }
+  .has-guide #world-toggle { bottom:calc(var(--guide-space) + 212px); }
   .has-guide #panel.expanded:not(.collapsed) { height:auto; }
   .guide-actions .btn { padding:6px; }
   .has-guide .modal-box .dialog-scroll { padding:16px; }

@@ -39,7 +39,8 @@ export function createMap(canvas, { onPick, onHover }) {
   let cw = 0, ch = 0, dpr = 1, k0 = 1;
   const view = { k: 1, x: 0, y: 0 };
   let tween = null;
-  let sel = null, hovered = null, showRivals = false, profitView = false;
+  let sel = null, hovered = null, showRivals = false, profitView = false, coverView = false;
+  const COVER = '#8fd3ff'; // airports not yet on the network, in coverage view
   // Amber normally; in profit view, green or red by yesterday's result and grey with nothing to go on.
   function routeColor(r) {
     if (!profitView) return companySoft(game.state);
@@ -455,9 +456,12 @@ export function createMap(canvas, { onPick, onHover }) {
         ctx.beginPath(); ctx.arc(px, py, 5.5, 0, 7); ctx.fillStyle = companyColor(game.state); ctx.fill();
         ctx.beginPath(); ctx.arc(px, py, 2.2, 0, 7); ctx.fillStyle = '#10161f'; ctx.fill();
       } else {
-        ctx.beginPath(); ctx.arc(px, py, r + (isDest ? 0.8 : 0), 0, 7);
-        ctx.fillStyle = isDest ? companyColor(game.state) : isHover || isSel ? '#e8f1f8' : C.dot;
-        ctx.fill();
+        const open = coverView && s && !isDest;
+        ctx.beginPath(); ctx.arc(px, py, r + (isDest ? 0.8 : open ? 1.2 : 0), 0, 7);
+        ctx.fillStyle = isDest ? companyColor(game.state) : open ? COVER : isHover || isSel ? '#e8f1f8' : C.dot;
+        if (coverView && isDest) ctx.globalAlpha = 0.4;
+        ctx.fill(); ctx.globalAlpha = 1;
+        if (open) { ctx.beginPath(); ctx.arc(px, py, r + 3.2, 0, 7); ctx.strokeStyle = 'rgba(143,211,255,.45)'; ctx.lineWidth = 1; ctx.stroke(); }
         if (rival) {
           ctx.beginPath(); ctx.arc(px, py, r + 3.5, 0, 7);
           ctx.strokeStyle = rival.color; ctx.lineWidth = 1.6; ctx.stroke();
@@ -722,9 +726,12 @@ export function createMap(canvas, { onPick, onHover }) {
         ctx.beginPath(); ctx.arc(px, py, 5.5, 0, 7); ctx.fillStyle = companyColor(game.state); ctx.fill();
         ctx.beginPath(); ctx.arc(px, py, 2.2, 0, 7); ctx.fillStyle = '#10161f'; ctx.fill();
       } else {
-        ctx.beginPath(); ctx.arc(px, py, r + (isDest ? 0.8 : 0), 0, 7);
-        ctx.fillStyle = isDest ? companyColor(game.state) : isHover || isSel ? '#ffffff' : 'rgba(215,232,245,.8)';
-        ctx.fill();
+        const open = coverView && s && !isDest;
+        ctx.beginPath(); ctx.arc(px, py, r + (isDest ? 0.8 : open ? 1.2 : 0), 0, 7);
+        ctx.fillStyle = isDest ? companyColor(game.state) : open ? COVER : isHover || isSel ? '#ffffff' : 'rgba(215,232,245,.8)';
+        if (coverView && isDest) ctx.globalAlpha = 0.4;
+        ctx.fill(); ctx.globalAlpha = 1;
+        if (open) { ctx.beginPath(); ctx.arc(px, py, r + 3.2, 0, 7); ctx.strokeStyle = 'rgba(143,211,255,.45)'; ctx.lineWidth = 1; ctx.stroke(); }
         if (rival) { ctx.beginPath(); ctx.arc(px, py, r + 3.5, 0, 7); ctx.strokeStyle = rival.color; ctx.lineWidth = 1.6; ctx.stroke(); }
       }
       if (isSel || isHover) {
@@ -800,6 +807,7 @@ export function createMap(canvas, { onPick, onHover }) {
     setSelected: (v) => { sel = v; },
     setShowRivals: (v) => { showRivals = v; },
     setProfitView: (v) => { profitView = v; },
+    setCoverView: (v) => { coverView = v; },
     setFree: (r) => { free = r; },
   };
 }
