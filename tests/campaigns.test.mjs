@@ -24,6 +24,7 @@ test('starting a campaign preserves the airline and does not credit historic act
 });
 test('daily challenges and scenarios cannot start or claim campaign grants',()=>{
  for(const mode of ['daily','sprint']){s.mode.id=mode;assert.match(game.startCampaign('regional'),/free play/);assert.equal(s.campaigns.active,null);}
+ s.mode.id='world';assert.equal(game.campaignWhy(),null,'the open-ended world mission allows campaigns');
  s.mode.id='free';const run=readyRegional(),cash=s.money;s.mode.id='daily';assert.match(game.claimCampaign('regional',0),/free play/);near(s.money,cash);assert.equal(run.phase,'ready');
 });
 test('regional links need a passenger aircraft and the stated size and distance',()=>{

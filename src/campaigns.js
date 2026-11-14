@@ -39,7 +39,9 @@ export const CAMPAIGNS={
 export const isRegionalLink=r=>r.km<=2500 && Math.min(AIRPORT_BY_ID[r.hub].size,AIRPORT_BY_ID[r.dest].size)<=3;
 const freshProgress=()=>({regionalPax:0,onTimeFreight:0,express:0,lateFreight:0,lostFreight:0,connections:0,missedConnections:0,profitDays:0});
 const activeRun=g=>g.state?.campaigns?.runs[g.state.campaigns.active];
-const counting=g=>{const r=activeRun(g);return g.state.mode.id==='free' && !g.state.over && r?.phase==='progress'?r:null;};
+// Open-ended ways to play (no deadline) can run campaigns; timed scenarios and the daily challenge cannot.
+const openEnded=g=>['free','world'].includes(g.state.mode.id);
+const counting=g=>{const r=activeRun(g);return openEnded(g) && !g.state.over && r?.phase==='progress'?r:null;};
 const uniqueLinks=routes=>[...new Map(routes.map(r=>[[r.hub,r.dest].sort().join(':'),r])).values()];
 export function campaignNetwork(g){
   const passenger=[],freight=[];
@@ -57,7 +59,7 @@ export function campaignNetwork(g){
 export const campaignActions={
   migrateCampaigns(){this.state.campaigns ||= {active:null,runs:{}};},
   campaignRun(id=this.state.campaigns?.active){return this.state.campaigns?.runs[id] || null;},
-  campaignWhy(){return this.state.over?'Continue the game before starting a campaign.':this.state.mode.id!=='free'?'Campaigns are available in free play. Finish this scenario, then choose Keep playing in free play.':null;},
+  campaignWhy(){return this.state.over?'Continue the game before starting a campaign.':!openEnded(this)?'Campaigns are available in free play. Finish this scenario, then choose Keep playing in free play.':null;},
   campaignStatus(id){
     const profile=CAMPAIGNS[id],run=this.campaignRun(id);if(!profile)return null;
     const chapter=profile.chapters[run?.chapter || 0],network=campaignNetwork(this),p=run?.progress || freshProgress();

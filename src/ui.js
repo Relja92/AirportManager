@@ -1374,7 +1374,7 @@ export function createUI(map, view) {
       return `<div class="item goal ${done ? 'done' : ''}"><span class="tick"></span><div><div class="name">${milestoneName(m)}</div><div class="sub">Reward ${fmtMoney(m.reward)}${!done && w.next === m ? ` · ${m.n - w.served} to go` : ''}</div></div></div>`;
     }).join('');
     return `<div class="section-label"><span>${term('Connect the world', 'coverage')}</span><span>${w.served} / ${w.total} airports</span></div>
-      <div class="item"><div class="meter"><i style="width:${(w.served / w.total) * 100}%"></i></div>
+      <div class="item">${game.scenario().id === 'world' ? `<div class="name" style="margin-bottom:6px">Your mission: ${game.scenario().goal.toLowerCase()}</div>` : ''}<div class="meter"><i style="width:${(w.served / w.total) * 100}%"></i></div>
         <div class="world-rows">${rows}</div>
         <div class="sub" style="margin-top:8px">${w.full ? `${plural(w.full, 'continent')} fully covered: demand ${pct(w.bonus)} on every route.` : `Cover a whole continent for +${Math.round(CONTINENT_BONUS * 100)}% demand on every route, once per continent.`}</div>
         <button class="btn ghost wide" style="margin-top:8px" data-act="world-view">${coverView ? 'Hide coverage on the map' : 'Show unserved airports on the map'}</button></div>
@@ -1383,14 +1383,12 @@ export function createUI(map, view) {
 
   function goalsTab(s) {
     const sc = game.scenario();
-    const w = game.worldProgress();
-    const box = sc.goal && !sc.deadline ? `<div class="section-label"><span>${sc.name}</span><span>${w.served} of ${w.total} airports</span></div>
-      <div class="item"><div class="name">${sc.goal}</div>
-      <div class="meter"><i style="width:${Math.min(100, (w.served / w.total) * 100)}%"></i></div></div>` : sc.goal ? `<div class="section-label"><span>${sc.name}</span><span>Day ${Math.min(s.day + 1, sc.deadline)} of ${sc.deadline}</span></div>
+    const box = sc.deadline && sc.goal ? `<div class="section-label"><span>${sc.name}</span><span>Day ${Math.min(s.day + 1, sc.deadline)} of ${sc.deadline}</span></div>
       <div class="item"><div class="name">${sc.goal}</div>
       <div class="meter"><i style="width:${Math.min(100, (s.day / sc.deadline) * 100)}%"></i></div>
       ${sc.id === 'daily' ? kv('Net worth so far', fmtMoney(game.netWorth()), 'mono') : ''}</div>` : '';
-    return `${box}${campaignSummary(s)}${worldSummary(s)}<div class="section-label"><span>Goals</span><span>${s.goalsDone.length} / ${GOALS.length}</span></div>` +
+    // In Connect the World the mission is the goal, so it leads the page.
+    return `${box}${sc.id === 'world' ? worldSummary(s) + campaignSummary(s) : campaignSummary(s) + worldSummary(s)}<div class="section-label"><span>Goals</span><span>${s.goalsDone.length} / ${GOALS.length}</span></div>` +
       GOALS.map((g) => `<div class="item goal ${s.goalsDone.includes(g.id) ? 'done' : ''}">
         <span class="tick"></span>
         <div><div class="name">${g.title}</div><div class="sub">Reward ${fmtMoney(g.reward)}</div></div>
