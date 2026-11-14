@@ -123,3 +123,15 @@ test('working out progress changes nothing, and an older save gets an empty reco
   assert.deepEqual(game.state.worldDone, []);
   assert.equal(game.worldProgress().served, 2);
 });
+
+test('the Connect the World start option is won only when every airport is served', () => {
+  game.newGame('LHR', 'world'); s = game.state; s.rivals = [];
+  assert.equal(game.scenario().id, 'world');
+  for (const a of AIRPORTS.slice(0, -1)) if (a.id !== 'LHR') link(a.id);
+  game.checkScenario(true);
+  assert.equal(s.over, null, 'one airport short, and no deadline to fail');
+  const last = AIRPORTS[AIRPORTS.length - 1].id;
+  if (last !== 'LHR') link(last);
+  game.checkScenario(false);
+  assert.equal(s.over.type, 'won');
+});

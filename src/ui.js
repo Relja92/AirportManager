@@ -1383,7 +1383,10 @@ export function createUI(map, view) {
 
   function goalsTab(s) {
     const sc = game.scenario();
-    const box = sc.goal ? `<div class="section-label"><span>${sc.name}</span><span>Day ${Math.min(s.day + 1, sc.deadline)} of ${sc.deadline}</span></div>
+    const w = game.worldProgress();
+    const box = sc.goal && !sc.deadline ? `<div class="section-label"><span>${sc.name}</span><span>${w.served} of ${w.total} airports</span></div>
+      <div class="item"><div class="name">${sc.goal}</div>
+      <div class="meter"><i style="width:${Math.min(100, (w.served / w.total) * 100)}%"></i></div></div>` : sc.goal ? `<div class="section-label"><span>${sc.name}</span><span>Day ${Math.min(s.day + 1, sc.deadline)} of ${sc.deadline}</span></div>
       <div class="item"><div class="name">${sc.goal}</div>
       <div class="meter"><i style="width:${Math.min(100, (s.day / sc.deadline) * 100)}%"></i></div>
       ${sc.id === 'daily' ? kv('Net worth so far', fmtMoney(game.netWorth()), 'mono') : ''}</div>` : '';

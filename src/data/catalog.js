@@ -149,6 +149,10 @@ export const ACHIEVEMENTS = [
 export const SCENARIOS = [
   { id: 'free', name: 'Free play', desc: 'Pick any airport. $1M, no deadline. Optional chapter campaigns are available in Goals & campaigns.' },
   {
+    id: 'world', name: 'Connect the World', desc: 'Any airport. No deadline. Put every airport on the map on your network, with milestone rewards along the way.',
+    goal: 'Serve every airport on the map', win: (s) => new Set(served(s)).size >= Object.keys(AIRPORT_BY_ID).length,
+  },
+  {
     id: 'sprint', name: 'Sixty-Day Sprint', desc: 'Any airport. Reach International Airport rank by day 60.',
     deadline: 60, goal: 'Reach International Airport rank', win: (s) => bestRank(s) >= 3,
   },
